@@ -1,6 +1,8 @@
 import numpy as np
+from .utils import is_sorted, PrettyDuration
 
 class SpikeGadgetsRecFileReader():
+    """Docstring goes here."""
 
     def __init__(self, *, start_byte_size=None, timestamp_size=None, bytes_per_neural_channel=None, header_size=None):
         # set defaults:
@@ -73,9 +75,28 @@ class JagularFileMap(object):
     """Helper class to read from multiple files spanning a conceptually continuous segment of data."""
 
     def __init__(self, *files, **kwargs):
+        """Docstring goes here!
+
+        Parameters
+        ==========
+        files : tuple, list, or multiple unnamed arguments, optional
+            Collectin of filenames to add to JagularFileMap.
+        fs : float, optional
+            Sampling rate (in Hz). Default value is 30,000 Hz.
+        start_byte_size : int, optional
+        timestamp_size : int, optional
+        bytes_per_neural_channel: int, optional
+        header_size: int, optional
+        """
         self.file_list = None
-        self._ts_starts = []
-        self._ts_stops = []
+        self._tsamples_starts = []
+        self._tsamples_stops = []
+
+        # initialize sampling rate
+        fs = kwargs.get('fs', None)
+        if fs is None:
+            fs = 30000
+        self.fs = fs
 
         kwargs['start_byte_size'] = kwargs.get('start_byte_size', None)
         kwargs['timestamp_size'] = kwargs.get('timestamp_size', None)
@@ -99,27 +120,12 @@ class JagularFileMap(object):
 
     def __repr__(self):
         address_str = " at " + str(hex(id(self)))
-        return "<JagularFileMap>%s" % (address_str)
-
-    def __pairwise(self, iterable):
-        """returns a zip of all neighboring pairs.
-        This is used as a helper function for is_sorted.
-
-        Example
-        -------
-        >>> mylist = [2, 3, 6, 8, 7]
-        >>> list(pairwise(mylist))
-        [(2, 3), (3, 6), (6, 8), (8, 7)]
-        """
-        from itertools import tee
-
-        a, b = tee(iterable)
-        next(b, None)
-        return zip(a, b)
-
-    def __is_sorted(self, iterable, key=lambda a, b: a <= b):
-        """Check to see if iterable is monotonic increasing (sorted)."""
-        return all(key(a, b) for a, b in self.__pairwise(iterable))
+        if self.isempty:
+            return "<Empty JagularFileMap>%s" % (address_str)
+        else:
+            nstr = "{} files spanning {} (missing {})".format(self.n_files, self.duration_w_gaps, self._inter_gap_duration())
+        return "<JagularFileMap: %s>%s" % (nstr, address_str)
+        #TODO: want something like this: <JagularFileMap: 5 files spanning 23:45:17 hours (missing 23:46 minutes)> at 0x2a039e201d0
 
     def add_files(self, *files):
         """Add files to internal list, and populate time boundaries."""
@@ -133,8 +139,8 @@ class JagularFileMap(object):
         for file in file_tuple:
             first_timestamp, last_timestamp, infile = self._reader.get_timestamp_bounds(file)
             assert first_timestamp <= last_timestamp, "first_timestamp > last_timestamp for file '{}'! Aborting...".format(file)
-            self._ts_starts.append(first_timestamp)
-            self._ts_stops.append(last_timestamp)
+            self._tsamples_starts.append(first_timestamp)
+            self._tsamples_stops.append(last_timestamp)
             if self.file_list:
                 self.file_list.append(file)
             else:
@@ -146,20 +152,29 @@ class JagularFileMap(object):
 
     def _sort(self):
         """Sort filenames, and timestamps according to starting timestamps."""
-        new_order = sorted(range(len(self._ts_starts)), key=lambda k: self._ts_starts[k])
-        self._ts_starts = np.array(self._ts_starts)[new_order].tolist()
-        self._ts_stops = np.array(self._ts_stops)[new_order].tolist()
+        new_order = sorted(range(len(self._tsamples_starts)), key=lambda k: self._tsamples_starts[k])
+        self._tsamples_starts = np.array(self._tsamples_starts)[new_order].tolist()
+        self._tsamples_stops = np.array(self._tsamples_stops)[new_order].tolist()
         self.file_list = np.array(self.file_list)[new_order].tolist()
+
+    def _inter_gap_duration(self):
+        """Total duration of gaps (in seconds) missing between files."""
+        return PrettyDuration((self.timesamples[1:,0] - self.timesamples[:-1,1]).sum()/self.fs)
 
     @property
     def timestamps(self):
-        """Timestamps array with size (n_files, 2), with each row as (start, stop)."""
-        return np.vstack((self._ts_starts, self._ts_stops)).T
+        """Timestamps (in seconds) array with size (n_files, 2), with each row as (start, stop)."""
+        return np.vstack((self._tsamples_starts, self._tsamples_stops)).T / self.fs
+
+    @property
+    def timesamples(self):
+        """Timestamps (in samples) array with size (n_files, 2), with each row as (start, stop)."""
+        return np.vstack((self._tsamples_starts, self._tsamples_stops)).T
 
     @property
     def issorted(self):
         """Returns True if timestamps are monotonically increasing."""
-        return self.__is_sorted(self._ts_starts)
+        return is_sorted(self._tsamples_starts)
 
     @property
     def isempty(self):
@@ -174,15 +189,31 @@ class JagularFileMap(object):
 
     @property
     def start(self):
-        """First timestamp in JagularFileMap."""
+        """First timestamp (in samples) in JagularFileMap."""
+        if not self.isempty:
+            return self.timesamples[0,0]
+        else:
+            return np.inf
+
+    @property
+    def stop(self):
+        """Last timestamp (in samples) in JagularFileMap."""
+        if not self.isempty:
+            return self.timesamples[-1,1]
+        else:
+            return -np.inf
+
+    @property
+    def start_time(self):
+        """First timestamp (in seconds) in JagularFileMap."""
         if not self.isempty:
             return self.timestamps[0,0]
         else:
             return np.inf
 
     @property
-    def stop(self):
-        """Last timestamp in JagularFileMap."""
+    def stop_time(self):
+        """Last timestamp (in seconds) in JagularFileMap."""
         if not self.isempty:
             return self.timestamps[-1,1]
         else:
@@ -190,18 +221,21 @@ class JagularFileMap(object):
 
     @property
     def duration_w_gaps(self):
-        """Total duration (in number of samples) mapped by file objects, including potential gaps."""
+        """Total duration (in seconds) mapped by file objects, including potential gaps."""
         if self.isempty:
-            return 0
+            return PrettyDuration(0)
         else:
-            return self.stop - self.start
+            return PrettyDuration((self.stop_time - self.start_time))
 
     @property
     def duration_wo_gaps(self):
-        """Total duration (in number of samples) mapped by file objects, excluding inter-file gaps.
+        """Total duration (in seconds) mapped by file objects, excluding inter-file gaps.
         NOTE: intra-file gaps are not taken into account here, but should be relatively small.
         """
-        raise NotImplementedError("not yet implemebted!")
+        if self.isempty:
+            return PrettyDuration(0)
+        else:
+            return PrettyDuration(np.diff(self.timestamps).sum())
 
     @property
     def n_files(self):
@@ -210,7 +244,16 @@ class JagularFileMap(object):
             return 0
         return len(self.file_list)
 
-    def _within_bounds(self, start, stop):
+    def plot(self):
+        """Plot the times spanned by all the files contained in the JagularFileMap."""
+        from nelpy.core import EpochArray
+        from nelpy.plotting import epochplot
+
+        ax = epochplot(EpochArray(self.timestamps))
+
+        return ax
+
+    def _samples_within_bounds(self, start, stop):
         """Check that [start, stop] is fully contained (inclusive) of [self.start, self.stop]"""
         if stop < start:
             raise ValueError("start time has to be less or equal to stop time!")
@@ -220,11 +263,21 @@ class JagularFileMap(object):
             raise ValueError("requested stop time is later than last avaialbe timestamp (={})!".format(self.stop))
         return True
 
+    def _time_within_bounds(self, start, stop):
+        """Check that [start, stop] is fully contained (inclusive) of [self.start_time, self.stop_time]"""
+        if stop < start:
+            raise ValueError("start time has to be less or equal to stop time!")
+        if start < self.start_time:
+            raise ValueError("requested start time is earlier than first avaialbe timestamp (={})!".format(self.start_time))
+        if stop > self.stop_time:
+            raise ValueError("requested stop time is later than last avaialbe timestamp (={})!".format(self.stop_time))
+        return True
+
     def request_data(self, start, stop, interpolate=True):
-        """Return data between start and stop, inclusive."""
+        """Return data between start and stop (in seconds?), inclusive."""
 
         # check that request is within allowable bounds
-        if self._within_bounds(start, stop):
+        if self._time_within_bounds(start, stop):
             # invoke reader here
             pass
 
