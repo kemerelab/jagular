@@ -112,6 +112,32 @@ class SpikeGadgetsRecFileReader():
         xmltree = ET.ElementTree(ET.fromstring(xmlstring))
         return xmltree
 
+    def read_block(self, file, block_size=None):
+        """Docstring goes here.
+
+        Parameters
+        ==========
+        file : an open file object to read from.
+        block_size: int, optional
+            Number of packets to read and return each time. Default is 1024.
+
+        Returns
+        =======
+        timestamps: list of timestamps (in samples)
+        channel_data: ndarray of size (n_channels, n_samples), where n_samples are
+        the actual number of read samples, up to a maximum of block_size.
+        """
+        if block_size is None:
+            block_size = 1024
+        # if we are anywhere in the header, move the pointer to the start of the first packet
+
+        # Then read up to 'block_size' number of packets, and unpack them into timestamps and channel_data.
+        # This can be done with a while packetdata: type construct, and in the end, we return as much as we can
+
+        # IMPORTANT! if no data is available to read, return timestamps = [], channel_data = None
+
+        return timestamps, channel_data
+
 
 class JagularFileMap(object):
     """Helper class to read from multiple files spanning a conceptually continuous segment of data."""
@@ -323,8 +349,63 @@ class JagularFileMap(object):
 
         raise NotImplementedError
 
-    def read_all(self, block_size=None, pad_before=None, pad_after=None, interpolate=True):
-        """Yield all data one block at a time."""
+    def read_stitched_files(self, block_size=None):
+        """Yield all data one block at a time, from multiple files that are stitched together.
+
+        Parameters
+        ==========
+        block_size: int, optional
+            Number of packets to read in each block. Default is 1024.
+
+        Returns
+        =======
+        block of packets at a time, as a tuple (timestamps, channel_data)
+        """
+
+        from contextlib import ExitStack
+
+        if self.isempty:
+            raise ValueError("Cannot read data from an empty JagularFileMap.")
+
+        if block_size is None:
+            block_size = 1024 # number of samples to read per step
+
+        with ExitStack() as stack:
+            files = [stack.enter_context(open(fname, 'r')) for fname in self.file_list]
+            ii=0
+            while True:
+                try:
+                    timestamps, channel_data = self._reader.read_block(file=files[ii], block_size=block_size)
+                    if 0 < len(timestamps) < block_size:
+                        # block_size could not be filled from current file, so advance to next file
+                        ii+=1
+                        timestamps_, channel_data_ = self._reader.read_block(file=files[ii], block_size=block_size-len(timestamps))
+                        if not isinstance(timestamps, list):
+                            raise TypeError("timestamps MUST be a list!")
+                        timestamps = timestamps + timestamps_ # list concatenation
+                        channel_data = np.hstack((channel_data, channel_data_))
+                    if timestamps:
+                        yield timestamps, channel_data_
+                    else:
+                        ii+=1
+                except IndexError:
+                    return
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         # FB! Check this out: http://neopythonic.blogspot.com/2008/10/sorting-million-32-bit-integers-in-2mb.html
         # Also check http://effbot.org/zone/wide-finder.htm for multiprocessing etc., but not sure about closing files?
@@ -345,13 +426,13 @@ class JagularFileMap(object):
 
         ####################
 
-        # def read_file(path, block_size=1024): 
-        #     with open(path, 'rb') as f: 
-        #         while True: 
-        #             piece = f.read(block_size) 
-        #             if piece: 
-        #                 yield piece 
-        #             else: 
+        # def read_file(path, block_size=1024):
+        #     with open(path, 'rb') as f:
+        #         while True:
+        #             piece = f.read(block_size)
+        #             if piece:
+        #                 yield piece
+        #             else:
         #                 return
 
         # for piece in read_file(path):
@@ -362,10 +443,3 @@ class JagularFileMap(object):
         #     for piece in jfm.read_all():
         #         filtered = scipy.filter(piece)
         #         fout.save(filtered)
-
-        raise NotImplementedError
-
-
-
-
-        
