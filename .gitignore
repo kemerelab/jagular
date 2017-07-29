@@ -1,0 +1,23 @@
+# vscode
+.vscode
+jagular/.vscode
+tags
+
+# code-python
+*.pyc
+Thumbs.db
+.DS_Store
+.idea/
+_build
+build
+dist
+*.eggs/
+*.egg-info/
+.ipynb_checkpoints/
+.cache/
+.playground/
+__pycache__
+
+# Etienne custom
+# temp
+examples/playground.ipynb
