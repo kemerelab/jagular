@@ -16,11 +16,17 @@ class FileInfo():
         self.filename = filename
 
     def get_timestamp_bounds(self, filename):
+        ii = 0
         # read .rec file embedded workspace and copy to a string
         with open(filename, 'rb') as infile:
             instr = infile.readline()
             while(instr != b'</Configuration>\n'):
                 instr = infile.readline()
+                ii += 1
+                # infinite loop protection
+                if ii > 1000000:
+                    print("Configuration info not found - check input file")
+                    break
             config_section_size = infile.tell()
             infile.seek(0, os.SEEK_SET)
             xmlstring = infile.read(config_section_size)
