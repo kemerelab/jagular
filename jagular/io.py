@@ -70,6 +70,7 @@ class SpikeGadgetsRecFileReader():
 
 
 class JagularFileMap(object):
+    """Helper class to read from multiple files spanning a conceptually continuous segment of data."""
 
     def __init__(self, *files, **kwargs):
         self.file_list = None
