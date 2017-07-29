@@ -114,7 +114,11 @@ class JagularFileMap(object):
 
     def __repr__(self):
         address_str = " at " + str(hex(id(self)))
-        return "<JagularFileMap>%s" % (address_str)
+        if self.isempty:
+            return "<Empty JagularFileMap>%s" % (address_str)
+        else:
+            nstr = "{} files spanning {} (missing {})".format(self.n_files, self.duration_w_gaps, self._inter_gap_duration())
+        return "<JagularFileMap: %s>%s" % (nstr, address_str)
         #TODO: want something like this: <JagularFileMap: 5 files spanning 23:45:17 hours (missing 23:46 minutes)> at 0x2a039e201d0
 
     def add_files(self, *files):
@@ -146,6 +150,10 @@ class JagularFileMap(object):
         self._tsamples_starts = np.array(self._tsamples_starts)[new_order].tolist()
         self._tsamples_stops = np.array(self._tsamples_stops)[new_order].tolist()
         self.file_list = np.array(self.file_list)[new_order].tolist()
+
+    def _inter_gap_duration(self):
+        """Total duration of gaps (in seconds) missing between files."""
+        return PrettyDuration((self.timesamples[1:,0] - self.timesamples[:-1,1]).sum()/self.fs)
 
     @property
     def timestamps(self):
