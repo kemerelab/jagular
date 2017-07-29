@@ -1,2 +1,2 @@
 # quokka
-Out-of-core pre-processing of big-ish electrophysiology data
+Out-of-core pre-processing of big-ish electrophysiology data.
