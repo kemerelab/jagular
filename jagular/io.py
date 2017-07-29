@@ -2,6 +2,7 @@ import numpy as np
 from .utils import is_sorted, PrettyDuration
 
 class SpikeGadgetsRecFileReader():
+    """Docstring goes here."""
 
     def __init__(self, *, start_byte_size=None, timestamp_size=None, bytes_per_neural_channel=None, header_size=None):
         # set defaults:
@@ -78,9 +79,14 @@ class JagularFileMap(object):
 
         Parameters
         ==========
-
+        files : tuple, list, or multiple unnamed arguments, optional
+            Collectin of filenames to add to JagularFileMap.
         fs : float, optional
             Sampling rate (in Hz). Default value is 30,000 Hz.
+        start_byte_size : int, optional
+        timestamp_size : int, optional
+        bytes_per_neural_channel: int, optional
+        header_size: int, optional
         """
         self.file_list = None
         self._tsamples_starts = []
