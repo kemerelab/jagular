@@ -1,10 +1,23 @@
 import numpy as np
+
+from os import SEEK_SET, SEEK_END
+from struct import unpack
+
 from .utils import is_sorted, PrettyDuration
 
 class SpikeGadgetsRecFileReader():
     """Docstring goes here."""
 
-    def __init__(self, *, start_byte_size=None, timestamp_size=None, bytes_per_neural_channel=None, header_size=None):
+    def __init__(self, *, start_byte_size=None, timestamp_size=None, bytes_per_neural_channel=None):
+        """Docstring goes here.
+
+        Parameters
+        ==========
+        start_byte_size : int, optional
+            Start byte size defaults to 1.
+        timestamp_size: int, optional
+
+        """
         # set defaults:
         if start_byte_size is None:
             start_byte_size = 1
@@ -12,23 +25,27 @@ class SpikeGadgetsRecFileReader():
             timestamp_size = 4
         if bytes_per_neural_channel is None:
             bytes_per_neural_channel = 2
-        if header_size is None:
-            header_size = start_byte_size
 
-        # not every recording will have neural data        
+        # not every recording will have neural data
         self.neural_data_size = 0
         self.start_byte_size = start_byte_size
         self.timestamp_size = timestamp_size
         self.bytes_per_neural_channel = bytes_per_neural_channel
         # minimum size of any packet
-        self.header_size = header_size
+        self.header_size = None
 
     def get_timestamp_bounds(self, filename):
-        import os
-        import struct
-        import xml.etree.ElementTree as ET
+        """Docstring goes here.
 
-        #TODO: JOSH LET'S FIX THIS!!!
+        Parameters
+        ==========
+        filename : 
+
+
+        Returns
+        =======
+
+        """
         header_size = 1
 
         # create xml tree from copied embedded workspace string
@@ -43,42 +60,53 @@ class SpikeGadgetsRecFileReader():
             self.neural_data_size = int(hw_config.get("numChannels"))*self.bytes_per_neural_channel
             for elements in hw_config.getchildren():
                 header_size += int(elements.get("numBytes"))
-        
+
         self.header_size = header_size
         # every packet needs a timestamp
         self.packet_size = self.header_size + self.timestamp_size + self.neural_data_size
 
-        with open(filename, 'rb') as infile:
+        with open(filename, 'rb') as f:
             # find first and last timestamps of file
-            infile.seek(self.config_section_size, os.SEEK_SET)
-            packet = infile.read(self.packet_size)
+            f.seek(self.config_section_size, SEEK_SET)
+            packet = f.read(self.packet_size)
             timestamp_start = self.header_size
             # <I format - assumes that the timestamp is an uint32
-            first_timestamp = struct.unpack('<I', packet[timestamp_start:timestamp_start + self.timestamp_size])[0]
-            infile.seek(-self.packet_size, os.SEEK_END)
-            packet = infile.read(self.packet_size)
-            last_timestamp = struct.unpack('<I', packet[timestamp_start:timestamp_start + self.timestamp_size])[0]
+            first_timestamp = unpack('<I', packet[timestamp_start:timestamp_start + self.timestamp_size])[0]
+            f.seek(-self.packet_size, SEEK_END)
+            packet = f.read(self.packet_size)
+            last_timestamp = unpack('<I', packet[timestamp_start:timestamp_start + self.timestamp_size])[0]
 
-        return (first_timestamp, last_timestamp, filename)
+        return (first_timestamp, last_timestamp)
 
     def get_config_info(self, filename):
-        import os
+        """Docstring goes here.
+
+        Parameters
+        ==========
+        filename : 
+
+
+        Returns
+        =======
+
+        """
         import xml.etree.ElementTree as ET
-        ii = 0
+
         xmlstring = None
 
         # read .rec file embedded workspace and copy to a string
-        with open(filename, 'rb') as infile:
-            instr = infile.readline()
+        with open(filename, 'rb') as f:
+            instr = f.readline()
+            ii = 0
             while(instr != b'</Configuration>\n'):
-                instr = infile.readline()
+                instr = f.readline()
                 ii += 1
                 # infinite loop protection
                 if ii > 1000:
                     raise ValueError("Configuration info not found - check input file")
-            self.config_section_size = infile.tell()
-            infile.seek(0, os.SEEK_SET)
-            xmlstring = infile.read(self.config_section_size)
+            self.config_section_size = f.tell()
+            f.seek(0, SEEK_SET)
+            xmlstring = f.read(self.config_section_size)
 
         # create xml tree from copied embedded workspace string
         xmltree = ET.ElementTree(ET.fromstring(xmlstring))
@@ -100,7 +128,6 @@ class JagularFileMap(object):
         start_byte_size : int, optional
         timestamp_size : int, optional
         bytes_per_neural_channel: int, optional
-        header_size: int, optional
         """
         self.file_list = None
         self._tsamples_starts = []
@@ -115,7 +142,6 @@ class JagularFileMap(object):
         kwargs['start_byte_size'] = kwargs.get('start_byte_size', None)
         kwargs['timestamp_size'] = kwargs.get('timestamp_size', None)
         kwargs['bytes_per_neural_channel'] = kwargs.get('bytes_per_neural_channel', None)
-        kwargs['header_size'] = kwargs.get('header_size', None)
 
         self._reader = SpikeGadgetsRecFileReader(**kwargs)
 
@@ -151,7 +177,7 @@ class JagularFileMap(object):
         file_tuple = self._get_file_tuple(files)
 
         for file in file_tuple:
-            first_timestamp, last_timestamp, infile = self._reader.get_timestamp_bounds(file)
+            first_timestamp, last_timestamp = self._reader.get_timestamp_bounds(file)
             assert first_timestamp <= last_timestamp, "first_timestamp > last_timestamp for file '{}'! Aborting...".format(file)
             self._tsamples_starts.append(first_timestamp)
             self._tsamples_stops.append(last_timestamp)
