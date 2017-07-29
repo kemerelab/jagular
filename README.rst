@@ -28,6 +28,7 @@ Where
 
 ===================   ========================================================
  download             https://pypi.python.org/pypi/jagular
+ inspiration          https://www.youtube.com/watch?v=WLCDAPNTpaM
  docs                 coming soon!
  code                 https://github.com/kemerelab/jagular
 ===================   ========================================================
