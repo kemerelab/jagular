@@ -1,10 +1,6 @@
 import numpy as np
-import os
-import struct
-import xml.etree.ElementTree as ET
 
-
-class SpikeGadgetsRecFile():
+class SpikeGadgetsRecFileReader():
 
     def __init__(self, *, start_byte_size=None, timestamp_size=None, bytes_per_neural_channel=None, header_size=None):
         # set defaults:
@@ -24,6 +20,10 @@ class SpikeGadgetsRecFile():
         self.header_size = header_size
 
     def get_timestamp_bounds(self, filename):
+        import os
+        import struct
+        import xml.etree.ElementTree as ET
+
         #TODO: JOSH LET'S FIX THIS!!!
         self.header_size = 1
         ii = 0
@@ -69,7 +69,6 @@ class SpikeGadgetsRecFile():
         return (first_timestamp, last_timestamp, filename)
 
 
-
 class JagularFileMap(object):
 
     def __init__(self, *files, **kwargs):
@@ -82,7 +81,7 @@ class JagularFileMap(object):
         kwargs['bytes_per_neural_channel'] = kwargs.get('bytes_per_neural_channel', None)
         kwargs['header_size'] = kwargs.get('header_size', None)
 
-        self._sgrf = SpikeGadgetsRecFile(**kwargs)
+        self._reader = SpikeGadgetsRecFileReader(**kwargs)
 
         file_tuple = self._get_file_tuple(files)
         if file_tuple:
@@ -131,8 +130,8 @@ class JagularFileMap(object):
         file_tuple = self._get_file_tuple(files)
 
         for file in file_tuple:
-            first_timestamp, last_timestamp, infile = self._sgrf.get_timestamp_bounds(file)
-            assert first_timestamp <= last_timestamp, "first_timestamp > last_timestamp!"
+            first_timestamp, last_timestamp, infile = self._reader.get_timestamp_bounds(file)
+            assert first_timestamp <= last_timestamp, "first_timestamp > last_timestamp for file '{}'! Aborting...".format(file)
             self._ts_starts.append(first_timestamp)
             self._ts_stops.append(last_timestamp)
             if self.file_list:
@@ -202,6 +201,13 @@ class JagularFileMap(object):
         NOTE: intra-file gaps are not taken into account here, but should be relatively small.
         """
         raise NotImplementedError("not yet implemebted!")
+
+    @property
+    def n_files(self):
+        """Number of files in JagularFileMap."""
+        if self.isempty:
+            return 0
+        return len(self.file_list)
 
     def _check_bounds(self, start, stop):
         """Check that [start, stop] is fully contained (inclusive) of [self.start, self.stop]"""
