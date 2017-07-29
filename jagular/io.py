@@ -29,7 +29,7 @@ class SpikeGadgetsRecFileReader():
         import xml.etree.ElementTree as ET
 
         #TODO: JOSH LET'S FIX THIS!!!
-        self.header_size = 1
+        header_size = 1
 
         # create xml tree from copied embedded workspace string
         tree = self.get_config_info(filename)
@@ -42,8 +42,9 @@ class SpikeGadgetsRecFileReader():
         else:
             self.neural_data_size = int(hw_config.get("numChannels"))*self.bytes_per_neural_channel
             for elements in hw_config.getchildren():
-                self.header_size += int(elements.get("numBytes"))
-
+                header_size += int(elements.get("numBytes"))
+        
+        self.header_size = header_size
         # every packet needs a timestamp
         self.packet_size = self.header_size + self.timestamp_size + self.neural_data_size
 
