@@ -1,7 +1,7 @@
 """
-Quokka default API.
+Jagular default API.
 
-``quokka`` is an out-of-core pre-processing framework for neuroelectrophysiology
+``jagular`` is an out-of-core pre-processing framework for neuroelectrophysiology
 data used in the Kemere lab at Rice University.
 """
 

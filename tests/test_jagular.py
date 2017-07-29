@@ -1,7 +1,7 @@
-from quokka.blah import *
+from jagular.blah import *
 import numpy as np
 
-class TestQuokka:
+class TestJagular:
 
     def test_Example(self):
         """Example test."""

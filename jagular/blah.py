@@ -1,4 +1,4 @@
-__all__ = ['QuokkaModel']
+__all__ = ['JagularModel']
 
 import numpy as np
 import copy
@@ -9,7 +9,7 @@ from scipy import interpolate
 from sys import float_info
 from collections import namedtuple
 
-class QuokkaModel(object):
+class JagularModel(object):
     def __init__(self, obj):
         self.obj = obj
 

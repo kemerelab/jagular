@@ -4,7 +4,7 @@ from distutils.util import convert_path
 from setuptools import setup, find_packages
 
 main_ns = {}
-ver_path = convert_path('quokka/version.py')
+ver_path = convert_path('jagular/version.py')
 with open(ver_path) as ver_file:
     exec(ver_file.read(), main_ns)
 
@@ -20,10 +20,10 @@ def read(*filenames, **kwargs):
 long_description = read('README.rst')
 
 setup(
-    name='quokka',
+    name='jagular',
     version=main_ns['__version__'],
-    url='https://github.com/kemerelab/quokka/',
-    download_url = 'https://github.com/kemerelab/quokka/tarball/' + main_ns['__version__'],
+    url='https://github.com/kemerelab/jagular/',
+    download_url = 'https://github.com/kemerelab/jagular/tarball/' + main_ns['__version__'],
     license='MIT License',
     author='Joshua Chu, Etienne Ackermann',
     install_requires=['numpy>=1.9.0'
