@@ -6,9 +6,10 @@ __all__ = ['frange',
            'PrettyDuration'
           ]
 
-from numpy import isinf, floor, linspace
+from numpy import isinf, linspace
 from itertools import tee
 from collections import namedtuple
+from math import floor
 
 def frange(start, stop, step):
     """arange with floating point step"""
@@ -118,7 +119,7 @@ class PrettyDuration(float):
         else:
             sstr = ""
         if dd > 0:
-            daystr = "{:01d} days ".format(dd)
+            daystr = "{:01d} days ".format(int(dd))
         else:
             daystr = ""
         if hh > 0:
