@@ -9,5 +9,4 @@ data used in the Kemere lab at Rice University.
 
 from . import blah
 
-
 from . version import __version__
