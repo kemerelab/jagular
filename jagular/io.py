@@ -209,7 +209,7 @@ class JagularFileMap(object):
             return 0
         return len(self.file_list)
 
-    def _check_bounds(self, start, stop):
+    def _within_bounds(self, start, stop):
         """Check that [start, stop] is fully contained (inclusive) of [self.start, self.stop]"""
         if stop < start:
             raise ValueError("start time has to be less or equal to stop time!")
@@ -218,3 +218,60 @@ class JagularFileMap(object):
         if stop > self.stop:
             raise ValueError("requested stop time is later than last avaialbe timestamp (={})!".format(self.stop))
         return True
+
+    def request_data(self, start, stop, interpolate=True):
+        """Return data between start and stop, inclusive."""
+
+        # check that request is within allowable bounds
+        if self._within_bounds(start, stop):
+            # invoke reader here
+            pass
+
+        raise NotImplementedError
+
+    def read_all(self, block_size=None, pad_before=None, pad_after=None, interpolate=True):
+        """Yield all data one block at a time."""
+
+        # FB! Check this out: http://neopythonic.blogspot.com/2008/10/sorting-million-32-bit-integers-in-2mb.html
+        # Also check http://effbot.org/zone/wide-finder.htm for multiprocessing etc., but not sure about closing files?
+        # and here: for multiple ctx managers: https://stackoverflow.com/questions/3024925/python-create-a-with-block-on-several-context-managers
+
+        # def getData(filename1, filename2):
+        #     with open(filename1, "rb") as csv1, open(filename2, "rb") as csv2:
+        #         reader1 = csv.reader(csv1)
+        #         reader2 = csv.reader(csv2)
+        #         for row1, row2 in zip(reader1, reader2):
+        #             yield (np.array(row1, dtype=np.float),
+        #                 np.array(row2, dtype=np.float))
+        #                 # This will give arrays of floats, for other types change dtype
+
+        # for tup in getData("file1", "file2"):
+        #     print(tup)
+
+
+        ####################
+
+        # def read_file(path, block_size=1024): 
+        #     with open(path, 'rb') as f: 
+        #         while True: 
+        #             piece = f.read(block_size) 
+        #             if piece: 
+        #                 yield piece 
+        #             else: 
+        #                 return
+
+        # for piece in read_file(path):
+        #     process_piece(piece)
+
+        # # pseudo code (used outside of JagularFileMap):
+        # with open(filename, 'wb') as fout:
+        #     for piece in jfm.read_all():
+        #         filtered = scipy.filter(piece)
+        #         fout.save(filtered)
+
+        raise NotImplementedError
+
+
+
+
+        
