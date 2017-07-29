@@ -385,7 +385,7 @@ class JagularFileMap(object):
                         timestamps = timestamps + timestamps_ # list concatenation
                         channel_data = np.hstack((channel_data, channel_data_))
                     if timestamps:
-                        yield timestamps, channel_data_
+                        yield timestamps, channel_data
                     else:
                         ii+=1
                 except IndexError:
