@@ -1,4 +1,5 @@
 import numpy as np
+from .utils import is_sorted
 
 class SpikeGadgetsRecFileReader():
 
@@ -100,26 +101,7 @@ class JagularFileMap(object):
     def __repr__(self):
         address_str = " at " + str(hex(id(self)))
         return "<JagularFileMap>%s" % (address_str)
-
-    def __pairwise(self, iterable):
-        """returns a zip of all neighboring pairs.
-        This is used as a helper function for is_sorted.
-
-        Example
-        -------
-        >>> mylist = [2, 3, 6, 8, 7]
-        >>> list(pairwise(mylist))
-        [(2, 3), (3, 6), (6, 8), (8, 7)]
-        """
-        from itertools import tee
-
-        a, b = tee(iterable)
-        next(b, None)
-        return zip(a, b)
-
-    def __is_sorted(self, iterable, key=lambda a, b: a <= b):
-        """Check to see if iterable is monotonic increasing (sorted)."""
-        return all(key(a, b) for a, b in self.__pairwise(iterable))
+        #TODO: want something like this: <JagularFileMap: 5 files spanning 23:45:17 hours (missing 23:46 minutes)> at 0x2a039e201d0
 
     def add_files(self, *files):
         """Add files to internal list, and populate time boundaries."""
@@ -159,7 +141,7 @@ class JagularFileMap(object):
     @property
     def issorted(self):
         """Returns True if timestamps are monotonically increasing."""
-        return self.__is_sorted(self._ts_starts)
+        return is_sorted(self._ts_starts)
 
     @property
     def isempty(self):
@@ -201,7 +183,10 @@ class JagularFileMap(object):
         """Total duration (in number of samples) mapped by file objects, excluding inter-file gaps.
         NOTE: intra-file gaps are not taken into account here, but should be relatively small.
         """
-        raise NotImplementedError("not yet implemebted!")
+        if self.isempty:
+            return 0
+        else:
+            return np.diff(self.timestamps).sum()
 
     @property
     def n_files(self):
@@ -209,6 +194,15 @@ class JagularFileMap(object):
         if self.isempty:
             return 0
         return len(self.file_list)
+
+    def plot(self):
+        """Plot the times spanned by all the files contained in the JagularFileMap."""
+        from nelpy.core import EpochArray
+        from nelpy.plotting import epochplot
+
+        ax = epochplot(EpochArray(self.timestamps))
+
+        return ax
 
     def _within_bounds(self, start, stop):
         """Check that [start, stop] is fully contained (inclusive) of [self.start, self.stop]"""

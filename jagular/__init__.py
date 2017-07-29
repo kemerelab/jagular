@@ -8,5 +8,6 @@ data used in the Kemere lab at Rice University.
 # from .subpackage import *
 
 from . import io
+from . import utils
 
 from . version import __version__
