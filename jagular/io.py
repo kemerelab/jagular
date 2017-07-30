@@ -5,6 +5,8 @@ from struct import unpack
 
 from .utils import is_sorted, PrettyDuration
 
+let_jpc6_struggle = False
+
 class SpikeGadgetsRecFileReader():
     """Docstring goes here."""
 
@@ -130,7 +132,7 @@ class SpikeGadgetsRecFileReader():
         """
 
         from io import StringIO
-        # TODO: if rec file info has not been determined yet, call method that 
+        # TODO: if rec file info has not been determined yet, call method that
         # will compute the appropriate values
         if block_size is None:
             block_size = 1024
@@ -399,7 +401,7 @@ class JagularFileMap(object):
             block_size = 1024 # number of samples to read per step
 
         with ExitStack() as stack:
-            files = [stack.enter_context(open(fname, 'r')) for fname in self.file_list]
+            files = [stack.enter_context(open(fname, 'rb')) for fname in self.file_list]
             ii=0
             while True:
                 try:
