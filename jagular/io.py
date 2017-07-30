@@ -57,7 +57,8 @@ class SpikeGadgetsRecFileReader():
         if hw_config is None:
             print("No hardware configuration defined!")
         else:
-            self.neural_data_size = int(hw_config.get("numChannels"))*self.bytes_per_neural_channel
+            self.n_channels = int(hw_config.get("numChannels"))
+            self.neural_data_size = self.n_channels*self.bytes_per_neural_channel
             for elements in hw_config.getchildren():
                 header_size += int(elements.get("numBytes"))
 
@@ -127,15 +128,42 @@ class SpikeGadgetsRecFileReader():
         channel_data: ndarray of size (n_channels, n_samples), where n_samples are
         the actual number of read samples, up to a maximum of block_size.
         """
+
+        from io import StringIO
+        # TODO: if rec file info has not been determined yet, call method that 
+        # will compute the appropriate values
         if block_size is None:
             block_size = 1024
-        # if we are anywhere in the header, move the pointer to the start of the first packet
 
-        # Then read up to 'block_size' number of packets, and unpack them into timestamps and channel_data.
-        # This can be done with a while packetdata: type construct, and in the end, we return as much as we can
+        timestamps = []
+        channel_data = np.zeros((self.n_channels, block_size))
+        timestamp_start = self.header_size
+        num_samples_read = 0
+        infile = file
 
-        # IMPORTANT! if no data is available to read, return timestamps = [], channel_data = None
-
+        # file pointer in config/embedded workspace section
+        if infile.tell() <= self.config_section_size:
+            infile.seek(self.config_section_size, SEEK_SET)
+        
+        for num_samples_read in range(0, block_size):
+            # reading packets sequentially, but not most efficient
+            packetdata = infile.read(self.packet_size)
+            print(packetdata)
+            # not enough data in a packet, resize channel_data
+            if (len(packetdata) < self.packet_size):
+                print(len(packetdata))
+                # no data to read
+                channel_data = channel_data[:,:num_samples_read]
+                return timestamps, channel_data
+            # assumes timestamp is uint32, but for future revisions,
+            # should determine appropriate format specifier from input
+            # file rather than relying on this assumption
+            timestamp = unpack('<I', packet[timestamp_start:timestamp_start + self.timestamp_size])[0]
+            timestamps.append(timestamp)
+            channel_data[:, num_samples_read] = np.frombuffer(packet, dtype=np.int16, count=self.n_channels,
+                                                             offset=timestamp_start + self.timestamp_size).reshape((self.n_channels,))
+            num_samples_read += 1
+        
         return timestamps, channel_data
 
 
