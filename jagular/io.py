@@ -33,6 +33,7 @@ class SpikeGadgetsRecFileReader():
         self.bytes_per_neural_channel = bytes_per_neural_channel
         # minimum size of any packet
         self.header_size = None
+        self.n_channels = None
 
     def get_timestamp_bounds(self, filename):
         """Docstring goes here.
@@ -129,25 +130,25 @@ class SpikeGadgetsRecFileReader():
         the actual number of read samples, up to a maximum of block_size.
         """
 
-        from io import StringIO
         # TODO: if rec file info has not been determined yet, call method that
         # will compute the appropriate values
+        if self.header_size is None or self.n_channels is None:
+            raise ValueError("rec file has not been properly intialized yet in SpikeGadgetsRecReader!")
+
         if block_size is None:
             block_size = 1024
 
         timestamps = []
         channel_data = np.zeros((self.n_channels, block_size))
         timestamp_start = self.header_size
-        num_samples_read = 0
-        infile = file
 
         # file pointer in config/embedded workspace section
-        if infile.tell() <= self.config_section_size:
-            infile.seek(self.config_section_size, SEEK_SET)
-        
-        for num_samples_read in range(0, block_size):
+        if file.tell() <= self.config_section_size:
+            file.seek(self.config_section_size, SEEK_SET)
+
+        for num_samples_read in range(block_size):
             # reading packets sequentially, but not most efficient
-            packetdata = infile.read(self.packet_size)
+            packetdata = file.read(self.packet_size)
             # print(packetdata)
             # not enough data in a packet, resize channel_data
             if (len(packetdata) < self.packet_size):
@@ -160,10 +161,12 @@ class SpikeGadgetsRecFileReader():
             # file rather than relying on this assumption
             timestamp = unpack('<I', packetdata[timestamp_start:timestamp_start + self.timestamp_size])[0]
             timestamps.append(timestamp)
-            channel_data[:, num_samples_read] = np.frombuffer(packetdata, dtype=np.int16, count=self.n_channels,
-                                                             offset=timestamp_start + self.timestamp_size).reshape((self.n_channels,))
-            num_samples_read += 1
-        
+            channel_data[:, num_samples_read] = np.frombuffer(buffer=packetdata,
+                                                              dtype=np.int16,
+                                                              count=self.n_channels,
+                                                              offset=timestamp_start + self.timestamp_size
+                                                              ).reshape((self.n_channels,))
+
         return timestamps, channel_data
 
 
@@ -411,13 +414,19 @@ class JagularFileMap(object):
                         if not isinstance(timestamps, list):
                             raise TypeError("timestamps MUST be a list!")
                         timestamps = timestamps + timestamps_ # list concatenation
-                        channel_data = np.hstack((channel_data, channel_data_))
+                        if channel_data_ is not None:
+                            channel_data = np.hstack((channel_data, channel_data_))
                     if timestamps:
                         yield timestamps, channel_data
                     else:
                         ii+=1
                 except IndexError:
-                    return
+                    # no more files are available, but we may still have some non-yielded data
+                    if timestamps:
+                        yield timestamps, channel_data
+                        return
+                    else:
+                        return
 
 
 
