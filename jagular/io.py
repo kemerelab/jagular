@@ -5,8 +5,6 @@ from struct import unpack
 
 from .utils import is_sorted, PrettyDuration
 
-let_jpc6_struggle = False
-
 class SpikeGadgetsRecFileReader():
     """Docstring goes here."""
 
@@ -150,19 +148,19 @@ class SpikeGadgetsRecFileReader():
         for num_samples_read in range(0, block_size):
             # reading packets sequentially, but not most efficient
             packetdata = infile.read(self.packet_size)
-            print(packetdata)
+            # print(packetdata)
             # not enough data in a packet, resize channel_data
             if (len(packetdata) < self.packet_size):
-                print(len(packetdata))
+                # print(len(packetdata))
                 # no data to read
                 channel_data = channel_data[:,:num_samples_read]
                 return timestamps, channel_data
             # assumes timestamp is uint32, but for future revisions,
             # should determine appropriate format specifier from input
             # file rather than relying on this assumption
-            timestamp = unpack('<I', packet[timestamp_start:timestamp_start + self.timestamp_size])[0]
+            timestamp = unpack('<I', packetdata[timestamp_start:timestamp_start + self.timestamp_size])[0]
             timestamps.append(timestamp)
-            channel_data[:, num_samples_read] = np.frombuffer(packet, dtype=np.int16, count=self.n_channels,
+            channel_data[:, num_samples_read] = np.frombuffer(packetdata, dtype=np.int16, count=self.n_channels,
                                                              offset=timestamp_start + self.timestamp_size).reshape((self.n_channels,))
             num_samples_read += 1
         
