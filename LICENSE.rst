@@ -1,7 +1,8 @@
-Jagular license
-=============
+***************
+jagular license
+***************
 
-Copyright (c) 2015-2016, contributors
+Copyright (c) 2015-2017, contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -25,15 +26,18 @@ AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY
 OR TORT ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 ADVISED IN ADVANCE OF THE POSSIBILITY OF SUCH DAMAGE.
 
+*************
 Licensed code
-=============
+*************
 
 Jagular relies on several open source libraries:
 
-- [NumPy](http://www.numpy.org/) - Used under [BSD license](http://www.numpy.org/license.html)
-- [pytest](http://docs.pytest.org/en/latest/) - Used under [MIT license](http://docs.pytest.org/en/latest/license.html)
+* `NumPy <http://www.numpy.org/>`_ - Used under `BSD license <http://www.numpy.org/license.html>`_
+* `SciPy <https://www.scipy.org/>`_ - Used under `BSD license <https://www.scipy.org/scipylib/license.html>`_
+* `pytest <http://docs.pytest.org/en/latest/>`_ - Used under `MIT license <http://docs.pytest.org/en/latest/lbitbucket.org/ned/coveragepy/src/default/NOTICE.txt?fileviewer=file-view-default>`_ 
 
+************
 Contributors
-============
-- Joshua Chu
-- Etienne Ackermann
+************
+* Etienne Ackermann
+* Joshua Chu
