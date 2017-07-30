@@ -407,7 +407,7 @@ class JagularFileMap(object):
             while True:
                 try:
                     timestamps, channel_data = self._reader.read_block(file=files[ii], block_size=block_size)
-                    if 0 < len(timestamps) < block_size:
+                    while 0 < len(timestamps) < block_size:
                         # block_size could not be filled from current file, so advance to next file
                         ii+=1
                         timestamps_, channel_data_ = self._reader.read_block(file=files[ii], block_size=block_size-len(timestamps))
