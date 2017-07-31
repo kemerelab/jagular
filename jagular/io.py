@@ -100,6 +100,7 @@ class SpikeGadgetsRecFileReader():
         import xml.etree.ElementTree as ET
         header_size = 1
         xmlstring = None
+        self.reindex_arr = []
 
         # read .rec file embedded workspace and copy to a string
         with open(filename, 'rb') as f:
@@ -129,6 +130,15 @@ class SpikeGadgetsRecFileReader():
             self.neural_data_size = self.n_channels * self.bytes_per_neural_channel
             for elements in hw_config.getchildren():
                 header_size += int(elements.get("numBytes"))
+            # Find all elements with tag "SpikeChannel"
+            # Note that the order of elements in reindex_arr will be in the
+            # same order as document order. For example, if we're reading
+            # tetrode data, the first four elements in reindex_arr correspond to
+            # the channels of tetrode 1, the next four correspond to tetrode 2, etc.
+            for spike_channel in root.iter("SpikeChannel"):
+                self.reindex_arr.append(int(spike_channel.get("hwChan")))
+            # Faster if we convert the native Python list to a numpy array when we reindex
+            self.reindex_arr = np.array(self.reindex_arr)
 
         self.header_size = header_size
         # every packet needs a timestamp
@@ -180,7 +190,9 @@ class SpikeGadgetsRecFileReader():
                 # or (2) reached end of file and so we read fewer
                 # completed packets than block_size
                 print("Read {} complete packets but requested {} packets".format(num_samples_read, block_size))
+                # resize and reorder channel_data!
                 channel_data = channel_data[:,:num_samples_read]
+                channel_data = channel_data[self.reindex_arr]
                 return timestamps, channel_data
             # assumes timestamp is uint32, but for future revisions,
             # should determine appropriate format specifier from input
@@ -193,6 +205,8 @@ class SpikeGadgetsRecFileReader():
                                                               offset=timestamp_start + self.timestamp_size
                                                               ).reshape((self.n_channels,))
 
+        # reorder channel_data!
+        channel_data = channel_data[self.reindex_arr]
         return timestamps, channel_data
 
 
