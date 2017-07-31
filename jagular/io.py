@@ -62,8 +62,9 @@ class SpikeGadgetsRecFileReader():
         (first_timestamp, last_timestamp) : tuple of the first and last timestamps
             contained in the .rec file
         """
-        # haven't determined configuration info yet so let's do that
-        if self.config_section_size is None:
+        # need to determine configuration info of file
+        if (self.config_section_size is None) or (self._filename != filename):
+            self._filename = filename
             self.get_config_info(filename)
 
         with open(filename, 'rb') as f:
@@ -149,9 +150,13 @@ class SpikeGadgetsRecFileReader():
         the actual number of read samples, up to a maximum of block_size.
         """
 
-        # haven't determined configuration info yet so let's do that
-        if self.config_section_size is None:
-            self.get_config_info(file)
+        # need to determine configuration info of file
+        if (self.config_section_size is None) or (self._filename != file.name):
+            self._filename = file.name
+            # if read_block() is called when the file is already opened, the 
+            # get_config_info() method will open that file again. So this 
+            # file should only be opened in read-only mode!
+            self.get_config_info(file.name)
             #raise ValueError("rec file has not been properly intialized yet in SpikeGadgetsRecReader!")
 
         if block_size is None:
