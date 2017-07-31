@@ -63,8 +63,8 @@ class SpikeGadgetsRecFileReader():
             contained in the .rec file
         """
         # need to determine configuration info of file
-        if (self.config_section_size is None) or (self._filename != filename):
-            self._filename = filename
+        if (self.config_section_size is None) or (self.filename != filename):
+            self.filename = filename
             self.get_config_info(filename)
 
         with open(filename, 'rb') as f:
@@ -152,10 +152,10 @@ class SpikeGadgetsRecFileReader():
 
         # need to determine configuration info of file
         if (self.config_section_size is None) or (self._filename != file.name):
-            self._filename = file.name
+            self.filename = file.name
             # if read_block() is called when the file is already opened, the 
-            # get_config_info() method will open that file again. So this 
-            # file should only be opened in read-only mode!
+            # get_config_info() method will open that file again. So get_config_info
+            # better open the file in read-only mode!
             self.get_config_info(file.name)
             #raise ValueError("rec file has not been properly intialized yet in SpikeGadgetsRecReader!")
 
