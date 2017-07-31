@@ -8,74 +8,78 @@ from .utils import is_sorted, PrettyDuration
 class SpikeGadgetsRecFileReader():
     """Docstring goes here."""
 
-    def __init__(self, *, start_byte_size=None, timestamp_size=None, bytes_per_neural_channel=None):
+    def __init__(self, *, start_byte_size = None, timestamp_size = None, n_channels = None,
+                 bytes_per_neural_channel = None, header_size = None):
         """Docstring goes here.
 
         Parameters
         ==========
         start_byte_size : int, optional
-            Start byte size defaults to 1.
-        timestamp_size: int, optional
-
+            Number of bytes for the start byte of a packet.
+            Defaults to 1
+        timestamp_size : int, optional
+            Number of bytes per timestamp.
+            Defaults to 4
+        n_channels : int, optional
+            Number of channels containing neural data.
+            Defaults to 0.
+        bytes_per_neural_channel : int, optional 
+            Defaults to 2.
+        header_size : int, optional
+            Number of bytes for the header section of a packet
+            Defaults to the value of start_byte_size
         """
         # set defaults:
         if start_byte_size is None:
             start_byte_size = 1
         if timestamp_size is None:
             timestamp_size = 4
+        if n_channels is None:
+            n_channels = 0
         if bytes_per_neural_channel is None:
             bytes_per_neural_channel = 2
 
-        # not every recording will have neural data
-        self.neural_data_size = 0
-        self.start_byte_size = start_byte_size
-        self.timestamp_size = timestamp_size
-        self.bytes_per_neural_channel = bytes_per_neural_channel
+        # size of embedded workspace
+        self.config_section_size = None
         # minimum size of any packet
-        self.header_size = None
-        self.n_channels = None
+        self.start_byte_size = start_byte_size
+        self.header_size = self.start_byte_size
+        self.timestamp_size = timestamp_size
+        # not every recording will have neural data
+        self.n_channels = n_channels
+        self.bytes_per_neural_channel = bytes_per_neural_channel
+        self.neural_data_size = self.n_channels * self.bytes_per_neural_channel
 
     def get_timestamp_bounds(self, filename):
         """Docstring goes here.
 
         Parameters
         ==========
-        filename : 
-
+        filename : string, path to .rec file
 
         Returns
         =======
-
+        (first_timestamp, last_timestamp) : tuple of the first and last timestamps
+            contained in the .rec file
         """
-        header_size = 1
-
-        # create xml tree from copied embedded workspace string
-        tree = self.get_config_info(filename)
-        root = tree.getroot()
-        hw_config = root.find("HardwareConfiguration")
-
-        # calculate packet size
-        if hw_config is None:
-            print("No hardware configuration defined!")
-        else:
-            self.n_channels = int(hw_config.get("numChannels"))
-            self.neural_data_size = self.n_channels*self.bytes_per_neural_channel
-            for elements in hw_config.getchildren():
-                header_size += int(elements.get("numBytes"))
-
-        self.header_size = header_size
-        # every packet needs a timestamp
-        self.packet_size = self.header_size + self.timestamp_size + self.neural_data_size
+        # haven't determined configuration info yet so let's do that
+        if self.config_section_size is None:
+            self.get_config_info(filename)
 
         with open(filename, 'rb') as f:
             # find first and last timestamps of file
             f.seek(self.config_section_size, SEEK_SET)
             packet = f.read(self.packet_size)
+            # unlikely but could happen in theory
+            if (len(packet) < self.packet_size):
+                raise ValueError("Insufficient data in first packet: packet size is {} bytes".format(len(packet)))
             timestamp_start = self.header_size
             # <I format - assumes that the timestamp is an uint32
             first_timestamp = unpack('<I', packet[timestamp_start:timestamp_start + self.timestamp_size])[0]
             f.seek(-self.packet_size, SEEK_END)
             packet = f.read(self.packet_size)
+            if (len(packet) < self.packet_size):
+                raise ValueError("Insufficient data in last packet: packet size is {} bytes".format(len(packet)))
             last_timestamp = unpack('<I', packet[timestamp_start:timestamp_start + self.timestamp_size])[0]
 
         return (first_timestamp, last_timestamp)
@@ -85,15 +89,15 @@ class SpikeGadgetsRecFileReader():
 
         Parameters
         ==========
-        filename : 
-
-
+        filename : string, path to .rec file from which to determine configuration
+            information as defined by the embedded workspace
+        
         Returns
         =======
-
+        None
         """
         import xml.etree.ElementTree as ET
-
+        header_size = 1
         xmlstring = None
 
         # read .rec file embedded workspace and copy to a string
@@ -112,9 +116,24 @@ class SpikeGadgetsRecFileReader():
 
         # create xml tree from copied embedded workspace string
         xmltree = ET.ElementTree(ET.fromstring(xmlstring))
-        return xmltree
 
-    def read_block(self, file, block_size=None):
+        root = xmltree.getroot()
+        hw_config = root.find("HardwareConfiguration")
+        # calculate packet size
+        if hw_config is None:
+            # no hardware, no data, at least for now
+            raise ValueError("No hardware configuration defined!")
+        else:
+            self.n_channels = int(hw_config.get("numChannels"))
+            self.neural_data_size = self.n_channels * self.bytes_per_neural_channel
+            for elements in hw_config.getchildren():
+                header_size += int(elements.get("numBytes"))
+
+        self.header_size = header_size
+        # every packet needs a timestamp
+        self.packet_size = self.header_size + self.timestamp_size + self.neural_data_size
+
+    def read_block(self, file, block_size = None):
         """Docstring goes here.
 
         Parameters
@@ -130,10 +149,10 @@ class SpikeGadgetsRecFileReader():
         the actual number of read samples, up to a maximum of block_size.
         """
 
-        # TODO: if rec file info has not been determined yet, call method that
-        # will compute the appropriate values
-        if self.header_size is None or self.n_channels is None:
-            raise ValueError("rec file has not been properly intialized yet in SpikeGadgetsRecReader!")
+        # haven't determined configuration info yet so let's do that
+        if self.config_section_size is None:
+            self.get_config_info(file)
+            #raise ValueError("rec file has not been properly intialized yet in SpikeGadgetsRecReader!")
 
         if block_size is None:
             block_size = 1024
@@ -149,11 +168,13 @@ class SpikeGadgetsRecFileReader():
         for num_samples_read in range(block_size):
             # reading packets sequentially, but not most efficient
             packetdata = file.read(self.packet_size)
-            # print(packetdata)
             # not enough data in a packet, resize channel_data
             if (len(packetdata) < self.packet_size):
-                # print(len(packetdata))
-                # no data to read
+                # not enough data in a packet. This situation can
+                # happen if (1) there is insufficient data in a packet
+                # or (2) reached end of file and so we read fewer
+                # completed packets than block_size
+                print("Read {} complete packets but requested {} packets".format(num_samples_read, block_size))
                 channel_data = channel_data[:,:num_samples_read]
                 return timestamps, channel_data
             # assumes timestamp is uint32, but for future revisions,
