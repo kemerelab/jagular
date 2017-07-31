@@ -161,7 +161,7 @@ class SpikeGadgetsRecFileReader():
         """
 
         # need to determine configuration info of file
-        if (self.config_section_size is None) or (self._filename != file.name):
+        if (self.config_section_size is None) or (self.filename != file.name):
             self.filename = file.name
             # if read_block() is called when the file is already opened, the 
             # get_config_info() method will open that file again. So get_config_info
@@ -190,6 +190,8 @@ class SpikeGadgetsRecFileReader():
                 # or (2) reached end of file and so we read fewer
                 # completed packets than block_size
                 print("Read {} complete packets but requested {} packets".format(num_samples_read, block_size))
+                if len(packetdata) == 0:
+                    print("empty packet")
                 # resize and reorder channel_data!
                 channel_data = channel_data[:,:num_samples_read]
                 channel_data = channel_data[self.reindex_arr]
