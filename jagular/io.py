@@ -174,41 +174,35 @@ class SpikeGadgetsRecFileReader():
 
         timestamps = []
         channel_data = np.zeros((self.n_channels, block_size))
-        timestamp_start = self.header_size
+
+        timestamp_size = self.timestamp_size
+        neural_channel_size = self.bytes_per_neural_channel
+
+        # set data types used for reading into numpy array
+        header_type = np.uint8
+        if timestamp_size == 4:
+            timestamp_type = np.uint32
+        else:
+            raise ValueError("Unsupported data type for timestamps!")
+        if neural_channel_size == 2:
+            neural_channel_type = np.int16
+        else:
+            raise ValueError("Unsupported data type for a neural channel!")
 
         # file pointer in config/embedded workspace section
         if file.tell() <= self.config_section_size:
             file.seek(self.config_section_size, SEEK_SET)
 
-        for num_samples_read in range(block_size):
-            # reading packets sequentially, but not most efficient
-            packetdata = file.read(self.packet_size)
-            # not enough data in a packet, resize channel_data
-            if (len(packetdata) < self.packet_size):
-                # not enough data in a packet. This situation can
-                # happen if (1) there is insufficient data in a packet
-                # or (2) reached end of file and so we read fewer
-                # completed packets than block_size
-                print("Read {} complete packets but requested {} packets".format(num_samples_read, block_size))
-                if len(packetdata) == 0:
-                    print("empty packet")
-                # resize and reorder channel_data!
-                channel_data = channel_data[:,:num_samples_read]
-                channel_data = channel_data[self.reindex_arr]
-                return timestamps, channel_data
-            # assumes timestamp is uint32, but for future revisions,
-            # should determine appropriate format specifier from input
-            # file rather than relying on this assumption
-            timestamp = unpack('<I', packetdata[timestamp_start:timestamp_start + self.timestamp_size])[0]
-            timestamps.append(timestamp)
-            channel_data[:, num_samples_read] = np.frombuffer(buffer=packetdata,
-                                                              dtype=np.int16,
-                                                              count=self.n_channels,
-                                                              offset=timestamp_start + self.timestamp_size
-                                                              ).reshape((self.n_channels,))
+        # will only read complete number of packets, so not a problem if the
+        # block size is larger than the number of packets we actually read
+        dt = np.dtype([('header', header_type, (self.header_size,)),
+                       ('timestamps', timestamp_type),
+                       ('channel_data', neural_channel_type, (self.n_channels,))])
+        data = np.fromfile(file, dtype=dt, count=block_size)
+        timestamps = data['timestamps'].tolist()
+        # reorder and extract only the channels we want
+        channel_data = (data['channel_data'].T)[self.reindex_arr]
 
-        # reorder channel_data!
-        channel_data = channel_data[self.reindex_arr]
         return timestamps, channel_data
 
 
