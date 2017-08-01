@@ -175,16 +175,13 @@ class SpikeGadgetsRecFileReader():
         timestamps = []
         channel_data = np.zeros((self.n_channels, block_size))
 
-        timestamp_size = self.timestamp_size
-        neural_channel_size = self.bytes_per_neural_channel
-
         # set data types used for reading into numpy array
         header_type = np.uint8
-        if timestamp_size == 4:
+        if self.timestamp_size == 4:
             timestamp_type = np.uint32
         else:
             raise ValueError("Unsupported data type for timestamps!")
-        if neural_channel_size == 2:
+        if self.bytes_per_neural_channel == 2:
             neural_channel_type = np.int16
         else:
             raise ValueError("Unsupported data type for a neural channel!")
