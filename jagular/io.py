@@ -47,6 +47,7 @@ class SpikeGadgetsRecFileReader():
         self.timestamp_size = timestamp_size
         # not every recording will have neural data
         self.n_channels = n_channels
+        self.n_spike_channels = None
         self.bytes_per_neural_channel = bytes_per_neural_channel
         self.neural_data_size = self.n_channels * self.bytes_per_neural_channel
 
@@ -140,6 +141,7 @@ class SpikeGadgetsRecFileReader():
             # Faster if we convert the native Python list to a numpy array when we reindex
             self.reindex_arr = np.array(self.reindex_arr)
 
+        self.n_spike_channels = len(self.reindex_arr)
         self.header_size = header_size
         # every packet needs a timestamp
         self.packet_size = self.header_size + self.timestamp_size + self.neural_data_size
@@ -171,9 +173,6 @@ class SpikeGadgetsRecFileReader():
 
         if block_size is None:
             block_size = 1024
-
-        timestamps = []
-        channel_data = np.zeros((self.n_channels, block_size))
 
         # set data types used for reading into numpy array
         header_type = np.uint8

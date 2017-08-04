@@ -10,6 +10,6 @@ data used in the Kemere lab at Rice University.
 from . import io
 from . import utils
 # from . import spikedetect
-# from . import filtering
+from . import filtering
 
 from . version import __version__

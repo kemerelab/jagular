@@ -17,6 +17,7 @@ dist
 .cache/
 .playground/
 __pycache__
+*.raw
 
 # Etienne custom
 # temp
