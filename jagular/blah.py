@@ -15,6 +15,8 @@ file_list = ['../sample_data/sample_data_1.rec',
 
 jfm = jag.io.JagularFileMap(file_list)
 
+block_size = 65536
+
 ch_out_prefix = ''
 ch_out_files = [ch_out_prefix + 'ch.' + str(n).zfill(4) + '.raw' for n in range(jfm._reader.n_spike_channels)]
 
@@ -25,7 +27,7 @@ with ExitStack() as stack:
     ts_file = stack.enter_context(open('timestamps.raw', 'wb+'))
     ch_files = [stack.enter_context(open(fname, 'wb+')) for fname in ch_out_files]
 
-    for ii, (ts, all_ch_data) in enumerate(jfm.read_stitched_files(block_size=4)):
+    for ii, (ts, all_ch_data) in enumerate(jfm.read_stitched_files(block_size=block_size)):
         num_packets = len(ts)
 
         my_ts_struct = struct.Struct('<%dI' % num_packets)
