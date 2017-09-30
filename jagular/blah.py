@@ -20,8 +20,9 @@ jfm = jag.io.JagularFileMap(file_list)
 
 block_size = 65536
 
+n_chan_zfill = len(str(jfm._reader.n_spike_channels)) # xxx for 100s of channels, xx for 10s of channels, xxxx for 1000s etc.
 ch_out_prefix = ''
-ch_out_files = [ch_out_prefix + 'ch.' + str(n).zfill(4) + '.raw' for n in range(jfm._reader.n_spike_channels)]
+ch_out_files = [ch_out_prefix + 'ch.' + str(n).zfill(n_chan_zfill) + '.raw' for n in range(jfm._reader.n_spike_channels)]
 
 #TODO: make filenames more configurable
 #TODO: warn if files already exist, or if we cannot create them (this latter one should be handled automatically)
