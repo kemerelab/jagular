@@ -1,17 +1,20 @@
 """Split raw channels into seperate files."""
 
 import struct
+import glob
 
-import jagular as jag
+import jagular as jag #TODO: don't import externally
 
 from contextlib import ExitStack
 
-file_list = ['../sample_data/sample_data_1.rec',
-             '../sample_data/sample_data_3.rec',
-             '../sample_data/sample_data_4.rec',
-             '../sample_data/sample_data_5.rec',
-             '../sample_data/sample_data_2.rec'
-            ]
+# file_list = ['../sample_data/sample_data_1.rec',
+#              '../sample_data/sample_data_3.rec',
+#              '../sample_data/sample_data_4.rec',
+#              '../sample_data/sample_data_5.rec',
+#              '../sample_data/sample_data_2.rec'
+#             ]
+
+file_list = glob.glob('*.rec')
 
 jfm = jag.io.JagularFileMap(file_list)
 

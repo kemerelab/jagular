@@ -8,6 +8,13 @@ This work is based on similar work by Kaushik Ghose. The original work can be fo
 https://github.com/kghose/neurapy/blob/master/neurapy/signal/continuous.py
 """
 
+# AllDataArr = np.memmap(DatFileName,dtype=np.int16,shape=(n_samples,n_ch_dat),mode='r')
+# b,a = signal.butter(3,100./(SAMPLE_RATE/2),'high') #filter at 100 Hz
+# IntraArr = AllDataArr[:,IntraChannel].copy()
+# IntraArr = signal.filtfilt(b,a,IntraArr)
+# Thresh = IntraArr.max()*THRESH_FRAC
+
+
 import pylab
 from scipy.signal import filtfilt, iirdesign
 
