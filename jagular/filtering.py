@@ -8,32 +8,38 @@ This work is based on similar work by Kaushik Ghose. The original work can be fo
 https://github.com/kghose/neurapy/blob/master/neurapy/signal/continuous.py
 """
 
-import pylab
+# AllDataArr = np.memmap(DatFileName,dtype=np.int16,shape=(n_samples,n_ch_dat),mode='r')
+# b,a = signal.butter(3,100./(SAMPLE_RATE/2),'high') #filter at 100 Hz
+# IntraArr = AllDataArr[:,IntraChannel].copy()
+# IntraArr = signal.filtfilt(b,a,IntraArr)
+# Thresh = IntraArr.max()*THRESH_FRAC
+
+from numpy import memmap
 from scipy.signal import filtfilt, iirdesign
 
 #Some useful presets
 spikegadgets_lfp = {
-  'fmt': 'i',
-  'fs' : 30000,  # sampling rate [Hz]
-  'fl' : 5,      # low cut for spike filtering
-  'fh' : 100,    # high cut for spike filtering
-  'gpass' : 0.1, # maximum loss in the passband (dB)
-  'gstop' : 15,  # minimum attenuation in the stopband (dB)
-  'buffer_len' : 1048576, # number of samples to process at a time (1048576 = 1024^2)
-  'overlap_len': 65536,   # number of samples to overlap, in each direction (65536 = 256^2)
-  'max_len': None
+    'dtype': 'np.int16',
+    'fs' : 30000,  # sampling rate [Hz]
+    'fl' : 5,      # low cut for spike filtering
+    'fh' : 100,    # high cut for spike filtering
+    'gpass' : 0.1, # maximum loss in the passband (dB)
+    'gstop' : 15,  # minimum attenuation in the stopband (dB)
+    'buffer_len' : 1048576, # number of samples to process at a time (1048576 = 1024^2)
+    'overlap_len': 65536,   # number of samples to overlap, in each direction (65536 = 256^2)
+    'max_len': None
 }
 
 spikegadgets_spike = {
-  'fmt': 'i',
-  'fs' : 30000,  # sampling rate [Hz]
-  'fl' : 500,    # low cut for spike filtering
-  'fh' : 8000,   # high cut for spike filtering
-  'gpass' : 0.1, # maximum loss in the passband (dB)
-  'gstop' : 15,  # minimum attenuation in the stopband (dB)
-  'buffer_len' : 1048576, # number of samples to process at a time (1048576 = 1024^2)
-  'overlap_len': 65536,   # number of samples to overlap, in each direction (65536 = 256^2)
-  'max_len': None
+    'dtype': 'np.int16',
+    'fs' : 30000,  # sampling rate [Hz]
+    'fl' : 500,    # low cut for spike filtering
+    'fh' : 8000,   # high cut for spike filtering
+    'gpass' : 0.1, # maximum loss in the passband (dB)
+    'gstop' : 15,  # minimum attenuation in the stopband (dB)
+    'buffer_len' : 1048576, # number of samples to process at a time (1048576 = 1024^2)
+    'overlap_len': 65536,   # number of samples to overlap, in each direction (65536 = 256^2)
+    'max_len': None
 }
 """Use these presets as follows
 from jagular import filtering as jfilt
@@ -87,51 +93,52 @@ y, b, a = jfilt.butterfilt(*files, ofile='test.raw', **jfilt.spikegadgets_spike)
         Only returned if ``output=='sos'``.
         """
 
-def butterfilt(finname, foutname, fmt, fs, fl=5.0, fh=100.0, gpass=1.0, gstop=30.0, ftype='butter', buffer_len=100000, overlap_len=100, max_len=-1):
-  """Given sampling frequency, low and high pass frequencies design a butterworth filter, and filter our data with it."""
-  fso2 = fs/2.0
-  wp = [fl/fso2, fh/fso2]
-  ws = [0.8*fl/fso2,1.4*fh/fso2]
-  b, a = iirdesign(wp, ws, gpass=gpass, gstop=gstop, ftype=ftype, output='ba')
-  y = filtfiltlong(finname, foutname, fmt, b, a, buffer_len, overlap_len, max_len)
-  return y, b, a
+def butterfilt(finname, foutname, dtype, fs, fl=5.0, fh=100.0, gpass=1.0, gstop=30.0, ftype='butter', buffer_len=100000, overlap_len=100, max_len=-1):
+    """Given sampling frequency, low and high pass frequencies design a butterworth filter, and filter our data with it."""
+    fso2 = fs/2.0
+    wp = [fl/fso2, fh/fso2]
+    ws = [0.8*fl/fso2,1.4*fh/fso2]
+    b, a = iirdesign(wp, ws, gpass=gpass, gstop=gstop, ftype=ftype, output='ba')
+    y = filtfiltlong(finname, foutname, dtype, b, a, buffer_len, overlap_len, max_len)
+    return y, b, a
 
-def filtfiltlong(finname, foutname, fmt, b, a, buffer_len=100000, overlap_len=100, max_len=-1):
-  """Use memmap and chunking to filter continuous data.
-  Inputs:
+def filtfiltlong(finname, foutname, dtype, b, a, buffer_len=100000, overlap_len=100, max_len=-1):
+    """Use memmap and chunking to filter continuous data.
+    Inputs:
     finname -
     foutname    -
-    fmt         - data format eg 'i'
+    dtype       - data format eg 'np.int16'
     b,a         - filter coefficients
     buffer_len  - how much data to process at a time
     overlap_len - how much data do we add to the end of each chunk to smooth out filter transients
     max_len     - how many samples to process. If set to -1, processes the whole file
-  Outputs:
+    Outputs:
     y           - The memmapped array pointing to the written file
-  Notes on algorithm:
+    Notes on algorithm:
     1. The arrays are memmapped, so we let pylab (numpy) take care of handling large arrays
     2. The filtering is done in chunks:
     Chunking details:
                 |<------- b1 ------->||<------- b2 ------->|
     -----[------*--------------{-----*------]--------------*------}----------
-         |<-------------- c1 -------------->|
-                               |<-------------- c2 -------------->|
+            |<-------------- c1 -------------->|
+                                |<-------------- c2 -------------->|
     From the array of data we cut out contiguous buffers (b1,b2,...) and to each buffer we add some extra overlap to
     make chunks (c1,c2). The overlap helps to remove the transients from the filtering which would otherwise appear at
     each buffer boundary.
-  """
-  x = pylab.memmap(finname, dtype=fmt, mode='r')
-  if max_len == -1:
-    max_len = x.size
-  y = pylab.memmap(foutname, dtype=fmt, mode='w+', shape=max_len)
+    """
+    x = memmap(finname, dtype=dtype, mode='r')
+    if max_len == -1:
+        max_len = x.size
+    y = memmap(foutname, dtype=dtype, mode='w+', shape=max_len)
+    # for each epoch
+        # determine start, stop
+    for buff_st_idx in range(0, max_len, buffer_len):
+        chk_st_idx = max(0, buff_st_idx - overlap_len)
+        buff_nd_idx = min(max_len, buff_st_idx + buffer_len)
+        chk_nd_idx = min(x.size, buff_nd_idx + overlap_len)
+        rel_st_idx = buff_st_idx - chk_st_idx
+        rel_nd_idx = buff_nd_idx - chk_st_idx
+        this_y_chk = filtfilt(b, a, x[chk_st_idx:chk_nd_idx], method="gust")
+        y[buff_st_idx:buff_nd_idx] = this_y_chk[rel_st_idx:rel_nd_idx]
 
-  for buff_st_idx in xrange(0, max_len, buffer_len):
-    chk_st_idx = max(0, buff_st_idx - overlap_len)
-    buff_nd_idx = min(max_len, buff_st_idx + buffer_len)
-    chk_nd_idx = min(x.size, buff_nd_idx + overlap_len)
-    rel_st_idx = buff_st_idx - chk_st_idx
-    rel_nd_idx = buff_nd_idx - chk_st_idx
-    this_y_chk = filtfilt(b, a, x[chk_st_idx:chk_nd_idx])
-    y[buff_st_idx:buff_nd_idx] = this_y_chk[rel_st_idx:rel_nd_idx]
-
-  return y
+    return y
