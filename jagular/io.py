@@ -23,7 +23,7 @@ class SpikeGadgetsRecFileReader():
         n_channels : int, optional
             Number of channels containing neural data.
             Defaults to 0.
-        bytes_per_neural_channel : int, optional 
+        bytes_per_neural_channel : int, optional
             Defaults to 2.
         header_size : int, optional
             Number of bytes for the header section of a packet
@@ -93,7 +93,7 @@ class SpikeGadgetsRecFileReader():
         ==========
         filename : string, path to .rec file from which to determine configuration
             information as defined by the embedded workspace
-        
+
         Returns
         =======
         None
@@ -165,7 +165,7 @@ class SpikeGadgetsRecFileReader():
         # need to determine configuration info of file
         if (self.config_section_size is None) or (self.filename != file.name):
             self.filename = file.name
-            # if read_block() is called when the file is already opened, the 
+            # if read_block() is called when the file is already opened, the
             # get_config_info() method will open that file again. So get_config_info
             # better open the file in read-only mode!
             self.get_config_info(file.name)
@@ -251,8 +251,10 @@ class JagularFileMap(object):
         address_str = " at " + str(hex(id(self)))
         if self.isempty:
             return "<Empty JagularFileMap>%s" % (address_str)
+        elif self.n_files > 1:
+            nstr = "{} files spanning {} (missing {} between files)".format(self.n_files, self.duration_w_gaps, self._inter_gap_duration())
         else:
-            nstr = "{} files spanning {} (missing {})".format(self.n_files, self.duration_w_gaps, self._inter_gap_duration())
+            nstr = "1 file spanning {}".format(self.duration_w_gaps)
         return "<JagularFileMap: %s>%s" % (nstr, address_str)
         #TODO: want something like this: <JagularFileMap: 5 files spanning 23:45:17 hours (missing 23:46 minutes)> at 0x2a039e201d0
 
