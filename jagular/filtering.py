@@ -20,9 +20,10 @@ from scipy.signal import filtfilt, iirdesign
 #Some useful presets
 spikegadgets_lfp = {
     'dtype': 'np.int16',
+    'ts_dtype': 'np.uint32',
     'fs' : 30000,  # sampling rate [Hz]
-    'fl' : 5,      # low cut for spike filtering
-    'fh' : 100,    # high cut for spike filtering
+    'fl' : None,      # low cut for spike filtering
+    'fh' : None,    # high cut for spike filtering
     'gpass' : 0.1, # maximum loss in the passband (dB)
     'gstop' : 15,  # minimum attenuation in the stopband (dB)
     'buffer_len' : 1048576, # number of samples to process at a time (1048576 = 1024^2)
@@ -32,6 +33,7 @@ spikegadgets_lfp = {
 
 spikegadgets_spike = {
     'dtype': 'np.int16',
+    'ts_dtype': 'np.uint32',
     'fs' : 30000,  # sampling rate [Hz]
     'fl' : 500,    # low cut for spike filtering
     'fh' : 8000,   # high cut for spike filtering

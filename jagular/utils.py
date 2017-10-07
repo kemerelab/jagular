@@ -6,17 +6,19 @@ __all__ = ['frange',
            'PrettyDuration'
           ]
 
-from numpy import isinf, linspace
+import numpy as np
+
 from itertools import tee
 from collections import namedtuple
 from math import floor
+from warnings import warn
 
 def frange(start, stop, step):
     """arange with floating point step"""
     # TODO: this function is not very general; we can extend it to work
     # for reverse (stop < start), empty, and default args, etc.
     num_steps = floor((stop-start)/step)
-    return linspace(start, stop, num=num_steps, endpoint=False)
+    return np.linspace(start, stop, num=num_steps, endpoint=False)
 
 def pairwise(iterable):
     """returns a zip of all neighboring pairs.
@@ -39,6 +41,103 @@ def is_sorted(iterable, key=lambda a, b: a <= b):
 def argsort(seq):
     # http://stackoverflow.com/questions/3071415/efficient-method-to-calculate-the-rank-vector-of-a-list-in-python
     return sorted(range(len(seq)), key=seq.__getitem__)
+
+def has_duplicate_timestamps(timestamps, assume_sorted=None, in_core=True):
+    """Docstring goes here."""
+    if not assume_sorted:
+        if not is_sorted(timestamps):
+            timestamps = np.sort(timestamps)
+
+    if in_core:
+        if np.any(np.diff(timestamps)<1):
+            return True
+    else:
+        raise NotImplementedError("out-of-core still needs to be implemented!")
+    return False
+
+def get_duplicate_timestamps(timestamps, assume_sorted=None, in_core=True):
+    """Docstring goes here."""
+    if not assume_sorted:
+        if not is_sorted(timestamps):
+            timestamps = np.sort(timestamps)
+    duplicates = []
+    if in_core:
+        if np.any(np.diff(timestamps)<1):
+            duplicates = timestamps[np.argwhere(np.diff(timestamps)<1)]
+    else:
+        raise NotImplementedError("out-of-core still needs to be implemented!")
+    return duplicates
+
+def get_gap_lengths_from_timestamps(timestamps, assume_sorted=None, in_core=True):
+    """Docstring goes here."""
+    cs = get_contiguous_segments(data=timestamps,
+                                 assume_sorted=assume_sorted,
+                                 in_core=in_core)
+    gap_lengths = cs[1:,0] - cs[:-1,1]
+    return gap_lengths
+
+def get_contiguous_segments(data, step=None, assume_sorted=None, in_core=True):
+    """Compute contiguous segments (seperated by step) in a list.
+
+    Note! This function requires that a sorted list is passed.
+    It first checks if the list is sorted O(n), and only sorts O(n log(n))
+    if necessary. But if you know that the list is already sorted,
+    you can pass assume_sorted=True, in which case it will skip
+    the O(n) check.
+
+    Returns an array of size (n_segments, 2), with each row
+    being of the form ([start, stop]) [inclusive, exclusive].
+
+    WARNING! Step is robustly computed in-core (i.e., when in_core is
+        True), but is assumed to be 1 when out-of-core.
+
+    Parameters
+    ----------
+    in_core : bool, optional
+        If True, then we use np.diff which requires all the data to fit
+        into memory simultaneously, otherwise we use groupby, which uses
+        a generator to process potentially much larger chunks of data,
+        but also much slower.
+    """
+    data = np.asarray(data)
+    if not assume_sorted:
+        if not is_sorted(data):
+            data = np.sort(data)  # algorithm assumes sorted list
+
+    if in_core:
+        if step is None:
+            step = np.median(np.diff(data))
+
+        # assuming that data(t1) is sampled somewhere on [t, t+1/fs) we have a 'continuous' signal as long as
+        # data(t2 = t1+1/fs) is sampled somewhere on [t+1/fs, t+2/fs). In the most extreme case, it could happen
+        # that t1 = t and t2 = t + 2/fs, i.e. a difference of 2 steps.
+
+        if np.any(np.diff(data) < step):
+            warn("some steps in the data are smaller than the requested step size.")
+
+        breaks = np.argwhere(np.diff(data)>=2*step)
+        starts = np.insert(breaks+1, 0, 0)
+        stops = np.append(breaks, len(data)-1)
+        bdries = np.vstack((data[starts], data[stops] + step)).T
+    else:
+        from itertools import groupby
+        from operator import itemgetter
+
+        if step is None:
+            step = 1
+
+        bdries = []
+
+        for k, g in groupby(enumerate(data), lambda ix: (ix[0] - ix[1])):
+            f = itemgetter(1)
+            gen = (f(x) for x in g)
+            start = next(gen)
+            stop = start
+            for stop in gen:
+                pass
+            bdries.append([start, stop + step])
+
+    return np.asarray(bdries)
 
 class PrettyBytes(int):
     """Prints number of bytes in a more readable format"""
@@ -104,7 +203,7 @@ class PrettyDuration(float):
     @staticmethod
     def time_string(seconds):
         """returns a formatted time string."""
-        if isinf(seconds):
+        if np.isinf(seconds):
             return 'inf'
         pos, dd, hh, mm, ss, s = PrettyDuration.to_dhms(seconds)
         if s > 0:
