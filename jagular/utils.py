@@ -99,12 +99,13 @@ def get_contiguous_segments(data, step=None, assume_sorted=None, in_core=True):
         a generator to process potentially much larger chunks of data,
         but also much slower.
     """
-    data = np.asarray(data)
-    if not assume_sorted:
-        if not is_sorted(data):
-            data = np.sort(data)  # algorithm assumes sorted list
-
     if in_core:
+        data = np.asarray(data)
+
+        if not assume_sorted:
+            if not is_sorted(data):
+                data = np.sort(data)  # algorithm assumes sorted list
+
         if step is None:
             step = np.median(np.diff(data))
 
@@ -122,6 +123,11 @@ def get_contiguous_segments(data, step=None, assume_sorted=None, in_core=True):
     else:
         from itertools import groupby
         from operator import itemgetter
+
+        if not assume_sorted:
+            if not is_sorted(data):
+                # data = np.sort(data)  # algorithm assumes sorted list
+                raise NotImplementedError("out-of-core sorting has not been implemented yet...")
 
         if step is None:
             step = 1
