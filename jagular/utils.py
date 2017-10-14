@@ -6,6 +6,7 @@ __all__ = ['frange',
            'PrettyDuration'
           ]
 
+import copy
 import numpy as np
 
 from itertools import tee
@@ -56,14 +57,18 @@ def has_duplicate_timestamps(timestamps, assume_sorted=None, in_core=True):
     return False
 
 def get_duplicate_timestamps(timestamps, assume_sorted=None, in_core=True):
-    """Docstring goes here."""
+    """Docstring goes here.
+    Important! Returns indices of duplicate timestamps, not timestamps directly.
+    For example, if the timestamps are [0, 1, 2, 10, 11, 11, 11, 12] then this
+    function will return np.array([5, 6])
+    """
     if not assume_sorted:
         if not is_sorted(timestamps):
             timestamps = np.sort(timestamps)
     duplicates = []
     if in_core:
         if np.any(np.diff(timestamps)<1):
-            duplicates = timestamps[np.argwhere(np.diff(timestamps)<1)]
+            duplicates = np.atleast_1d((np.argwhere(np.diff(timestamps)<1)+1).squeeze())
     else:
         raise NotImplementedError("out-of-core still needs to be implemented!")
     return duplicates
@@ -144,6 +149,264 @@ def get_contiguous_segments(data, step=None, assume_sorted=None, in_core=True):
             bdries.append([start, stop + step])
 
     return np.asarray(bdries)
+
+def sanitize_timestamps(timestamps, max_gap_size=150, in_core=True, ts_dtype=None, verbose=True):
+    """
+    max_gap_size: in samples, inclusive, which will be interpolated over
+    """
+
+    def is_integer(my_list):
+        """
+        my_list = [1,2,5,6, 9.0, '65'] # True, since all elements can be cast without loss to integers
+        my_list = [1,2,5,6, 9.0, 'a'] # False, since 'a' is not an integer
+        """
+        try:
+            return all(float(item).is_integer() for item in my_list)
+        except ValueError:
+            pass
+        return False
+
+    if ts_dtype is None:
+        ts_dtype = np.uint32
+
+    timestamps_new = copy.copy(timestamps)
+
+    # step 1: make sure that timestamps are integral, and the expected datatype:
+    if isinstance(timestamps, np.ndarray):
+        if timestamps.dtype != ts_dtype:
+            raise TypeError('timestamps are in an unexpected format: {} expected, but {} found!'.format(ts_dtype, timestamps.dtype))
+    elif isinstance(timestamps, list):
+        if not is_integer(timestamps):
+            raise TypeError('timestamps are in an unexpected format; integral values expected, but non-integral values found!')
+    else:
+        raise TypeError('timestamps are in an unexpected format!')
+
+    # step 2: make sure that timestamps are ordered
+    if in_core:
+        if not is_sorted(timestamps):
+            ts = np.sort(timestamps) # this assumes in-core
+    else:
+        raise NotImplementedError('out-of-core sorting has not been implemented yet')
+
+    # step 3: check for, and remove duplicate timestamps
+    dupes_to_drop = []
+    dupes = get_duplicate_timestamps(timestamps=timestamps)
+    if dupes:
+        if verbose:
+            print('{} duplicate timestamp(s) found; only keeping data corresponding to first occurence(s)'.format(len(dupes)))
+        #TODO: drop duplicate timestamps and corresponding data
+        timestamps_new = np.delete(timestamps, dupes)
+        dupes_to_drop = dupes
+
+    # step 4: check for, and prepare for dealing with missing timestamps
+    if verbose:
+        gap_lengths = get_gap_lengths_from_timestamps(timestamps=timestamps, in_core=True)
+        if gap_lengths.sum():
+            print('{} samples are missing from interior of current block; {}+ samples will be filled in by interpolation'.format(int(gap_lengths.sum()), int(np.where(gap_lengths < max_gap_size, gap_lengths, 0).sum())))
+
+    return timestamps_new, dupes_to_drop
+
+def check_timestamps(timestamps, ts_dtype=None):
+    """Docstring goes here.
+    """
+
+    def is_integer(my_list):
+        """
+        my_list = [1,2,5,6, 9.0, '65'] # True, since all elements can be cast without loss to integers
+        my_list = [1,2,5,6, 9.0, 'a'] # False, since 'a' is not an integer
+        """
+        try:
+            return all(float(item).is_integer() for item in my_list)
+        except ValueError:
+            pass
+        return False
+
+    if ts_dtype is None:
+        ts_dtype = np.uint32
+
+    # step 1: make sure that timestamps are integral, and the expected datatype:
+    if isinstance(timestamps, np.ndarray):
+        if timestamps.dtype != ts_dtype:
+            print('timestamps are in an unexpected format: {} expected, but {} found!'.format(ts_dtype, timestamps.dtype))
+            return False
+    elif isinstance(timestamps, list):
+        if not is_integer(timestamps):
+            print('timestamps are in an unexpected format; integral values expected, but non-integral values found!')
+            return False
+    else:
+        print('timestamps are in an unexpected format!')
+        return False
+
+    # step 2: make sure that timestamps are ordered
+    if not is_sorted(timestamps):
+        print('timestamps are not sorted in increasing order')
+        return False
+
+    # step 3: check for duplicate timestamps
+    dupes = get_duplicate_timestamps(timestamps=timestamps)
+    if dupes:
+        print('{} duplicate timestamp(s) found'.format(len(dupes)))
+        return False
+
+    return True
+
+def extract_channels(jfm, ts_out=None, max_gap_size=None, ch_out_prefix=None, subset='all',
+                     block_size=None, ts_dtype=None, verbose=False):
+    """Docstring goes here
+
+    Parameters
+    ==========
+    jfm: JagularFileMap
+    ts_out: string, optional
+        Filename of timestamps file; defaults to 'timestamps.raw'
+    max_gap_size: int, optional
+        Number of samples (inclusive) to fill with linear interpolation.
+        Default is 0.
+    ch_out_prefix: string, optional
+        Prefix to append to filename: prefixch.xx.raw. Default is None.
+    subset: string or array-like, optional
+        List of channels to write out, default is 'all'.
+    block_size: int, optional
+        Number of packets to read in at a time. Default is 65536
+    ts_dtype: np.dtype, optional
+        Type for timestamps, default is np.uint32.
+        NOTE: currently no other types are supported!
+
+    Returns
+    =======
+        None
+
+    TODO: add format options for both channel data, and timestamp data!
+
+    """
+    from contextlib import ExitStack
+    from scipy.interpolate import interp1d
+    from struct import Struct
+
+    if ts_out is None:
+        ts_out = 'timestamps.raw'
+    if max_gap_size is None:
+        max_gap_size = 0
+    if subset == 'all':
+        subset = range(jfm._reader.n_spike_channels)
+    if block_size is None:
+        block_size = 65536
+    if ts_dtype is None:
+        ts_dtype = np.uint32
+    else:
+        raise NotImplementedError('Only np.uint32 is currently supported for ts_dtype!')
+
+    n_chan_zfill = len(str(jfm._reader.n_spike_channels))
+
+    ch_out_files = [ch_out_prefix + 'ch.' + str(n).zfill(n_chan_zfill) + '.raw' for n in subset]
+
+    prev_channel_data = None # used for across-block interpolation
+    prev_ts_data = None      # used for across-block interpolation
+    # assumption: block_size >> interp_size (we can check for this with an assert), but actually works
+    # even when this assumption is not satisfied... yeah!!!
+
+    with ExitStack() as stack:
+        ts_file = stack.enter_context(open(ts_out, 'wb+'))
+        ch_files = [stack.enter_context(open(fname, 'wb+')) for fname in ch_out_files]
+
+        for ii, (ts, all_ch_data) in enumerate(jfm.read_stitched_files(block_size=block_size)):
+            if verbose:
+                print('processing block {}'.format(ii))
+
+            ts, dupes_to_drop = sanitize_timestamps(ts, verbose=verbose)
+            all_ch_data = np.delete(all_ch_data, dupes_to_drop, axis=1)
+
+            if max_gap_size > 0:
+
+                if prev_ts_data is not None:
+                    inter_block_gap = ts[0] - prev_ts_data
+                    if (inter_block_gap <= max_gap_size) & (inter_block_gap > 1):
+                        print('we need to interpolate across blocks! (block {} to {}, sample {} to {})'.format(ii-1, ii, prev_ts_data, ts[0]))
+                        pre_ts = np.arange(prev_ts_data, ts[0])
+                        f = interp1d([prev_ts_data, ts[0]], np.vstack([prev_channel_data, all_ch_data[:,0]]).T, assume_sorted=True)
+                        pre_ch = f(pre_ts) # in floats, not np.int16!
+                        pre_ch = pre_ch.astype(np.int16)
+                        print(pre_ch.shape)
+                        print(all_ch_data.shape)
+                        all_ch_data = np.hstack([pre_ch, all_ch_data])
+                        print(all_ch_data.shape)
+                        ts = np.hstack([pre_ts, ts])
+                        print(ts)
+
+                prev_ts_data = ts[-1]
+                prev_channel_data = all_ch_data[:,-1]
+
+                # now interpolate all interior qualifying regions of the block:
+                # get gaps
+                cs = get_contiguous_segments(ts).astype(np.int32)
+                gap_lengths = cs[1:,0] - cs[:-1,1]
+
+                if np.any(gap_lengths <= max_gap_size):
+                    # only do this if there are some gaps satisfying the criteria
+                    tt = np.argwhere(gap_lengths<=max_gap_size)
+                    vv = np.argwhere(gap_lengths>max_gap_size)
+                    ccl = (np.cumsum(cs[:,1] - cs[:,0]) - 1).astype(np.int32)
+                    ccr = np.cumsum(cs[:,1] - cs[:,0]).astype(np.int32)
+                    orig_data_locs = np.vstack((np.insert(ccr[:-1],0,0),ccr)).T # want this as seperate function, too!
+                    split_data_ts = []
+                    split_data = []
+                    for kk, (start, stop) in enumerate(orig_data_locs):
+                        split_data_ts.append(cs[kk,0])
+                        split_data.append(all_ch_data[:,start:stop])
+                    stops = cs[:,1]
+                    starts = cs[1:,0]
+
+                    interpl_ts = np.atleast_1d(stops[tt].squeeze())
+                    interpl_ch = np.atleast_2d(all_ch_data[:,ccl[tt]])
+                    interpl_ch = interpl_ch.squeeze(axis=2)
+
+                    interpr_ts = np.atleast_1d(starts[tt].squeeze())
+                    interpr_ch = np.atleast_2d(all_ch_data[:,ccr[tt]])
+                    interpr_ch = interpr_ch.squeeze(axis=2)
+
+                    new_cs = np.hstack((np.vstack((cs[0,0], starts[vv])), np.vstack((stops[vv], cs[-1,1]))))
+
+                    # generate new timestamps:
+                    ts_list = [list((nn for nn in range(start, stop))) for (start, stop) in new_cs]
+                    ts_new = [item for sublist in ts_list for item in sublist]
+
+                    for kk, (itsl, itsr) in enumerate(zip(interpl_ts, interpr_ts)):
+                        # build interp object
+                        f = interp1d([itsl-1, itsr], np.vstack([interpl_ch[:,kk], interpr_ch[:,kk]]).T, assume_sorted=True)
+                        interp_ts = np.arange(itsl, itsr)
+                        interp_ch = f(interp_ts) # in floats, not np.int16!
+                        interp_ch = interp_ch.astype(np.int16)
+                        split_data_ts.append(itsl)
+                        split_data.append(interp_ch)
+
+                    # now reassemble split channeldata chunks in order:
+                    chunk_order = np.argsort(split_data_ts)
+                    ch_data_new = np.hstack([split_data[hh] for hh in chunk_order])
+
+                    all_ch_data = ch_data_new
+                    ts = ts_new
+
+            # re-estimate number of packets
+            num_packets = len(ts)
+            my_ch_struct = Struct('<%dh' % num_packets)
+            my_ts_struct = Struct('<%dI' % num_packets) # ts_dtype should affect this!!!!
+            ts_packed = my_ts_struct.pack(*ts)
+
+            for ii, ch in enumerate(subset):
+                ch_packed = my_ch_struct.pack(*all_ch_data[ch,:])
+                # write current channel data of current block to file:
+                ch_files[ii].write(ch_packed)
+
+            # write timestamps of current block to file:
+            ts_file.write(ts_packed)
+
+    # inspect entire timestamps file to check for consistency:
+    ts = np.fromfile(ts_out, dtype=ts_dtype)
+    if not check_timestamps(ts):
+        raise ValueError('block-level timestamps were consistent, but session-level timestamps still have errors!')
+    if verbose:
+        print('all timestamps OK')
+
 
 class PrettyBytes(int):
     """Prints number of bytes in a more readable format"""
