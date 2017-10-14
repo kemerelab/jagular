@@ -6,6 +6,9 @@ import numpy as np
 
 import jagular as jag #TODO: don't import externally
 
+import nelpy as nel
+import nelpy.plotting as npl
+
 # file_list = ['../sample_data/sample_data_1.rec',
 #              '../sample_data/sample_data_3.rec',
 #              '../sample_data/sample_data_4.rec',
@@ -37,3 +40,15 @@ x2 = np.fromfile('channels/ch.00.raw', dtype=np.int16)
 
 plt.plot(ts1,x1, lw=5, c='0.3')
 plt.plot(ts2,x2, lw=1, c='w')
+
+ts = np.fromfile('timestamps.raw', dtype=np.uint32)
+y = np.fromfile('channels/subset_ch.00.raw', dtype=np.int16)
+sig = nel.AnalogSignalArray(ydata=y, timestamps=ts/30000, fs=30000)
+print(sig)
+npl.plot(sig)
+
+ts = np.fromfile('timestamps_new.raw', dtype=np.uint32)
+y = np.fromfile('channels/ch.00.raw', dtype=np.int16)
+sig = nel.AnalogSignalArray(ydata=y, timestamps=ts/30000, fs=30000)
+print(sig)
+npl.plot(sig)
