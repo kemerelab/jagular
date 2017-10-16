@@ -6,11 +6,12 @@ from struct import unpack
 from .utils import is_sorted, PrettyDuration
 
 class SpikeGadgetsRecFileReader():
-    """Docstring goes here."""
+    """This class can read and extract data from rec files recorded with
+    SpikeGadgets hardware."""
 
     def __init__(self, *, start_byte_size = None, timestamp_size = None, n_channels = None,
                  bytes_per_neural_channel = None, header_size = None):
-        """Docstring goes here.
+        """Initializes SpikeGadgetsRecFileReader class.
 
         Parameters
         ==========
@@ -52,7 +53,7 @@ class SpikeGadgetsRecFileReader():
         self.neural_data_size = self.n_channels * self.bytes_per_neural_channel
 
     def get_timestamp_bounds(self, filename):
-        """Docstring goes here.
+        """Returns the first and last timestamps recorded in the .rec file.
 
         Parameters
         ==========
@@ -87,7 +88,8 @@ class SpikeGadgetsRecFileReader():
         return (first_timestamp, last_timestamp)
 
     def get_config_info(self, filename):
-        """Docstring goes here.
+        """Parses configuration information defined in the embedded workspace of 
+        a .rec file.
 
         Parameters
         ==========
@@ -147,7 +149,7 @@ class SpikeGadgetsRecFileReader():
         self.packet_size = self.header_size + self.timestamp_size + self.neural_data_size
 
     def read_block(self, file, block_size = None):
-        """Docstring goes here.
+        """Reads a block of neural data in a .rec file.
 
         Parameters
         ==========
@@ -185,10 +187,13 @@ class SpikeGadgetsRecFileReader():
         else:
             raise ValueError("Unsupported data type for a neural channel!")
 
-        # file pointer in config/embedded workspace section
+        # file pointer in config/embedded workspace section. Seek to location
+        # where neural data starts
         if file.tell() <= self.config_section_size:
             file.seek(self.config_section_size, SEEK_SET)
 
+        if self.n_channels == 0:
+            raise ValueError("Expect no neural data to be recorded on rec file!")
         # will only read complete number of packets, so not a problem if the
         # block size is larger than the number of packets we actually read
         dt = np.dtype([('header', header_type, (self.header_size,)),
