@@ -26,7 +26,8 @@ setup(
     download_url = 'https://github.com/kemerelab/jagular/tarball/' + main_ns['__version__'],
     license='MIT License',
     author='Joshua Chu, Etienne Ackermann',
-    install_requires=['numpy>=1.9.0'
+    install_requires=['numpy>=1.9.0',
+                      'scipy>=0.18.0' # sosfiltfilt
                     ],
     author_email='jpc6@rice.edu',
     description='Out-of-core pre-processing of big-ish electrophysiology data.',

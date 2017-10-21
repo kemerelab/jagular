@@ -52,3 +52,20 @@ y = np.fromfile('channels/ch.00.raw', dtype=np.int16)
 sig = nel.AnalogSignalArray(ydata=y, timestamps=ts/30000, fs=30000)
 print(sig)
 npl.plot(sig)
+
+# now filter some data!
+timestamps = np.fromfile('timestamps.raw', dtype=np.uint32)
+y = jag.filtfilt_mmap(timestamps=timestamps,
+             finname='channels/subset_ch.00.raw',
+             buffer_len=167600,
+             foutname='filtered2.raw',
+             fs=30000,
+             fl=7,
+             fh=9)
+
+from .filtering import spikegadgets_spike_filter_params
+
+y = jag.filtfilt_mmap(timestamps=timestamps,
+                      finname='channels/subset_ch.00.raw',
+                      foutname='filtered2.raw',
+                      **spikegadgets_spike_filter_params)
