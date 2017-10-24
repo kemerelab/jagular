@@ -191,7 +191,7 @@ def sanitize_timestamps(timestamps, max_gap_size=150, in_core=True, ts_dtype=Non
     # step 3: check for, and remove duplicate timestamps
     dupes_to_drop = []
     dupes = get_duplicate_timestamps(timestamps=timestamps)
-    if dupes:
+    if np.any(dupes):
         if verbose:
             print('{} duplicate timestamp(s) found; only keeping data corresponding to first occurence(s)'.format(len(dupes)))
         #TODO: drop duplicate timestamps and corresponding data
