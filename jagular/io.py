@@ -180,6 +180,8 @@ class JagularFileMap(object):
         """Durations (in seconds) for each file object."""
         if self.isempty:
             return PrettyDuration(0)
+        elif self.n_files == 1:
+            return PrettyDuration(np.diff(self.timestamps).squeeze())
         else:
             return [PrettyDuration(duration) for duration in np.diff(self.timestamps).squeeze()]
 

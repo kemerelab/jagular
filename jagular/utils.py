@@ -277,6 +277,7 @@ def extract_channels(jfm, ts_out=None, max_gap_size=None, ch_out_prefix=None, su
         None
 
     TODO: add format options for both channel data, and timestamp data!
+    TODO: check whether timestamps.raw or whatever already exists
 
     """
     from contextlib import ExitStack
