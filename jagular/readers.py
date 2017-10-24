@@ -52,6 +52,10 @@ class JagularFileReader(ABC):
         # return timestamps, channel_data
         return
 
+
+########################################################################
+# class SpikeGadgetsSingleChannelReader
+########################################################################
 class SpikeGadgetsSingleChannelReader(JagularFileReader):
     """This class can read and parse data from a raw channel file extracted from
     SpikeGadgets hardware."""
@@ -122,6 +126,10 @@ class SpikeGadgetsSingleChannelReader(JagularFileReader):
 
         return timestamps, channel_data
 
+
+########################################################################
+# class SpikeGadgetsRecFileReader
+########################################################################
 class SpikeGadgetsRecFileReader(JagularFileReader):
     """This class can read and extract data from rec files recorded with
     SpikeGadgets hardware."""
