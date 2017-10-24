@@ -339,15 +339,15 @@ def extract_channels(jfm, ts_out=None, max_gap_size=None, ch_out_prefix=None, su
 
                 # now interpolate all interior qualifying regions of the block:
                 # get gaps
-                cs = get_contiguous_segments(ts).astype(np.int32)
+                cs = get_contiguous_segments(ts).astype(np.uint32)
                 gap_lengths = cs[1:,0] - cs[:-1,1]
 
                 if np.any(gap_lengths <= max_gap_size):
                     # only do this if there are some gaps satisfying the criteria
                     tt = np.argwhere(gap_lengths<=max_gap_size)
                     vv = np.argwhere(gap_lengths>max_gap_size)
-                    ccl = (np.cumsum(cs[:,1] - cs[:,0]) - 1).astype(np.int32)
-                    ccr = np.cumsum(cs[:,1] - cs[:,0]).astype(np.int32)
+                    ccl = (np.cumsum(cs[:,1] - cs[:,0]) - 1).astype(np.uint32)
+                    ccr = np.cumsum(cs[:,1] - cs[:,0]).astype(np.uint32)
                     orig_data_locs = np.vstack((np.insert(ccr[:-1],0,0),ccr)).T # want this as seperate function, too!
                     split_data_ts = []
                     split_data = []
