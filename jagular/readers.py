@@ -1,29 +1,163 @@
-class SpikeGadgetsSingleChannelReader():
+import numpy as np
+
+from os import SEEK_SET, SEEK_END
+from struct import unpack
+from abc import ABC, abstractmethod
+
+########################################################################
+# class JagularFileReader
+########################################################################
+class JagularFileReader(ABC):
+    """Base class for JagularFileReader objects."""
+
+    def __init__(self):
+        pass
+
+    def __repr__(self):
+        return self.__class__.__name__
+
+    @abstractmethod
+    def get_timestamp_bounds(self, filename):
+        """Returns the first and last timestamps recorded in a particular file.
+
+        Most commonly, the filename would be a .rec file, and the JagularFileMap
+        will call get_timestamp_bounds for each file in its list, so as to build
+        up a list of timestamp boundaries.
+
+        However, this assumes that the timestamp information is available in
+        'filename', which is true for a SpikeGadgets .rec file, but is no longer
+        true when we read a .raw channel file, for example, in which case the
+        timestamps are contained in a seperate timestamps file. In such a case,
+        the 'filename' argument does not really make sense, but it is still here
+        for backward compatibility. It could be changed, however, since it is
+        not part of the publically-facing API.
+        """
+        return
+
+    @abstractmethod
+    def read_block(self, ch_file, block_size=None):
+        """Reads a block of data, and returns the timestamps, and data for the
+        block.
+        """
+        # return timestamps, channel_data
+        return
+
+class SpikeGadgetsSingleChannelReader(JagularFileReader):
     """This class can read and parse data from a raw channel file extracted from
     SpikeGadgets hardware."""
 
-    def __init__(self, *, timestamp_size=None, dtype=None):
+    def __init__(self, *, required_arg, timestamps_file=None, timestamps_dtype=None, dtype=None):
+        """Initializes SpikeGadgetsSingleChannelReader class.
+
+        Parameters
+        ==========
+        timestamps_file : str, optional
+            Filename of timestamps file. If None, then timestamps will be
+            inferred, starting from zero, and assuming no breaks in the channel
+            data.
+        timestamps_dtype : dtype, optional
+            Defaults to np.uint64
+        dtype : dtype, optional
+            Defaults to np.int16
+        """
+        # set defaults:
+        if timestamps_dtype is None:
+            timestamps_dtype = np.uint64
+        if dtype is None:
+            dtype = np.int16
+
+        self.timestamps_file = timestamps_file
+        self.timestamps_dtype = timestamps_dtype
+        self.dtype = dtype # channel data dtype
+
+    def get_timestamp_bounds(self, filename):
+        """Returns the first and last timestamps recorded in the timestamps file.
+
+        Parameters
+        ==========
+        filename : string, path to .raw file (NOT TIMESTAMPS FILE!)
+
+        Returns
+        =======
+        (first_timestamp, last_timestamp) : tuple of the first and last timestamps
+            contained in the timestamps file
+        """
+        # return 0, 5
+        raise NotImplementedError
+
+    def read_block(self, ch_file, block_size=None):
+        """Reads a block of neural data from a .raw channel file.
+
+        Parameters
+        ==========
+        file : an open file object to read from.
+        block_size: int, optional
+            Number of packets to read and return each time. Default is 1024.
+
+        Returns
+        =======
+        timestamps: list of timestamps (in samples)
+        channel_data: ndarray of size (n_channels, n_samples), where n_samples are
+        the actual number of read samples, up to a maximum of block_size.
+        """
+
+        if block_size is None:
+            block_size = 1024
+
+        channel_data = np.fromfile(ch_file, dtype=self.dtype, count=block_size)
+        if self.timestamps_file is None:
+            raise NotImplementedError('we do not yet support auto timestamp inderence')
+        else:
+            timestamps = np.fromfile(self.timestamps_file, dtype=self.timestamps_dtype, count=block_size)
+
+        return timestamps, channel_data
+
+class SpikeGadgetsRecFileReader(JagularFileReader):
+    """This class can read and extract data from rec files recorded with
+    SpikeGadgets hardware."""
+
+    def __init__(self, *, start_byte_size=None, timestamp_size=None, n_channels=None,
+                 bytes_per_neural_channel=None, header_size=None):
         """Initializes SpikeGadgetsRecFileReader class.
 
         Parameters
         ==========
+        start_byte_size : int, optional
+            Number of bytes for the start byte of a packet.
+            Defaults to 1
         timestamp_size : int, optional
             Number of bytes per timestamp.
             Defaults to 4
-        bytes_per_sample : int, optional
+        n_channels : int, optional
+            Number of channels containing neural data.
+            Defaults to 0.
+        bytes_per_neural_channel : int, optional
             Defaults to 2.
         header_size : int, optional
             Number of bytes for the header section of a packet
             Defaults to the value of start_byte_size
         """
         # set defaults:
+        if start_byte_size is None:
+            start_byte_size = 1
         if timestamp_size is None:
             timestamp_size = 4
-        if bytes_per_sample is None:
-            bytes_per_sample = 2
+        if n_channels is None:
+            n_channels = 0
+        if bytes_per_neural_channel is None:
+            bytes_per_neural_channel = 2
 
+        # size of embedded workspace
+        self.config_section_size = None
+        # minimum size of any packet
+        self.start_byte_size = start_byte_size
+        self.header_size = self.start_byte_size
         self.timestamp_size = timestamp_size
-        self.bytes_per_sample = bytes_per_sample
+        # not every recording will have neural data
+        self.n_channels = n_channels
+        self.n_spike_channels = None
+        self.bytes_per_neural_channel = bytes_per_neural_channel
+        self.neural_data_size = self.n_channels * self.bytes_per_neural_channel
 
     def get_timestamp_bounds(self, filename):
         """Returns the first and last timestamps recorded in the .rec file.
