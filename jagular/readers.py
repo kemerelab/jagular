@@ -35,9 +35,19 @@ class JagularFileReader(ABC):
         return
 
     @abstractmethod
-    def read_block(self, ch_file, block_size=None):
+    def read_block(self, file, block_size=None):
         """Reads a block of data, and returns the timestamps, and data for the
         block.
+
+        Here, file is an OPEN file pointer, so all we need to implement here
+        is to read the next block_size data from the open file. We do not need
+        to open the file, and we do not need to seek to any specific place.
+        Simply read the next block_size data and return the timestamps and data
+        corresponding to that block.
+
+        You also don't need to be careful about checking for boundary conditions
+        since all of that is handled for you by JagularFileMap when it consumes
+        this method.
         """
         # return timestamps, channel_data
         return

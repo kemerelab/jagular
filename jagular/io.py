@@ -15,11 +15,11 @@ class JagularFileMap(object):
             Collectin of filenames to add to JagularFileMap.
         fs : float, optional
             Sampling rate (in Hz). Default value is 30,000 Hz.
-        start_byte_size : int, optional
-        timestamp_size : int, optional
-        bytes_per_neural_channel: int, optional
         reader : JagularFileReader, optional
             JagularFileReader object; default is SpikeGadgetsRecFileReader
+            - start_byte_size : int, optional
+            - timestamp_size : int, optional
+            - bytes_per_neural_channel: int, optional
         """
         self.file_list = None
         self._tsamples_starts = []
