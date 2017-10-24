@@ -9,8 +9,8 @@ class SpikeGadgetsRecFileReader():
     """This class can read and extract data from rec files recorded with
     SpikeGadgets hardware."""
 
-    def __init__(self, *, start_byte_size = None, timestamp_size = None, n_channels = None,
-                 bytes_per_neural_channel = None, header_size = None):
+    def __init__(self, *, start_byte_size=None, timestamp_size=None, n_channels=None,
+                 bytes_per_neural_channel=None, header_size=None):
         """Initializes SpikeGadgetsRecFileReader class.
 
         Parameters
@@ -372,6 +372,14 @@ class JagularFileMap(object):
             return PrettyDuration(0)
         else:
             return PrettyDuration(np.diff(self.timestamps).sum())
+
+    @property
+    def durations(self):
+        """Durations (in seconds) for each file object."""
+        if self.isempty:
+            return PrettyDuration(0)
+        else:
+            return [PrettyDuration(duration) for duration in np.diff(self.timestamps).squeeze()]
 
     @property
     def n_files(self):
