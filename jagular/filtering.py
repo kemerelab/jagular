@@ -16,7 +16,8 @@ from .utils import get_contiguous_segments
 
 def filtfilt_mmap(timestamps, finname, foutname, fs, fl=None, fh=None,
                   gpass=None, gstop=None, dtype=None, ftype='cheby2',
-                  buffer_len=16777216, overlap_len=None, max_len=None):
+                  buffer_len=4194304, overlap_len=None, max_len=None,
+                  **kwargs):
     """Zero-phase forward backward out-of-core Chebyshev type II filter.
 
     Parameters
@@ -47,7 +48,7 @@ def filtfilt_mmap(timestamps, finname, foutname, fs, fl=None, fh=None,
             - Cauer/elliptic: 'ellip'
             - Bessel/Thomson: 'bessel'
     buffer_len : int, optional
-        How much data to process at a time
+        How much data to process at a time. Default is 2**22 = 4194304 samples.
     overlap_len : int, optional
         How much data do we add to the end of each chunk to smooth out filter
         transients
@@ -106,11 +107,13 @@ def filtfilt_mmap(timestamps, finname, foutname, fs, fl=None, fh=None,
                                     sos=sos,
                                     buffer_len=buffer_len,
                                     overlap_len=overlap_len,
-                                    max_len=max_len)
+                                    max_len=max_len,
+                                    **kwargs)
     return y
 
 def filtfilt_within_epochs_mmap(timestamps, finname, foutname, dtype, sos,
-                                buffer_len=16777216, overlap_len=None, max_len=None):
+                                buffer_len=4194304, overlap_len=None,
+                                max_len=None, **kwargs):
     """Zero-phase forward backward out-of-core filtering within epochs.
 
     Use memmap and chunking to filter continuous data within contiguous segments
@@ -128,7 +131,7 @@ def filtfilt_within_epochs_mmap(timestamps, finname, foutname, dtype, sos,
     sos : ndarray
         Second-order sections representation of the IIR filter.
     buffer_len : int, optional
-        How much data to process at a time
+        How much data to process at a time. Default is 2**22 = 4194304 samples.
     overlap_len : int, optional
         How much data do we add to the end of each chunk to smooth out filter
         transients
@@ -166,17 +169,21 @@ def filtfilt_within_epochs_mmap(timestamps, finname, foutname, dtype, sos,
     except OSError:
         raise ValueError('Not sure why this ODError is raised, actually? File already exists?')
 
-    epochs = get_contiguous_segments(timestamps) # epochs in timestamps
-    ccr = np.cumsum(epochs[:,1] - epochs[:,0]).astype(np.int64)
-    filter_epochs = np.vstack((np.insert(ccr[:-1],0,0),ccr)).T # epochs in indices
+    assume_sorted = kwargs.get('assume_sorted', None)
+    step = kwargs.get('step', None)
+
+    filter_epochs =  get_contiguous_segments(data=timestamps,
+                                             assume_sorted=assume_sorted,
+                                             step=step,
+                                             index=True)
 
     for (start, stop) in filter_epochs:
         for buff_st_idx in range(start, stop, buffer_len):
-            chk_st_idx = max(start, buff_st_idx - overlap_len)
-            buff_nd_idx = min(stop, buff_st_idx + buffer_len)
-            chk_nd_idx = min(stop, buff_nd_idx + overlap_len)
-            rel_st_idx = buff_st_idx - chk_st_idx
-            rel_nd_idx = buff_nd_idx - chk_st_idx
+            chk_st_idx = int(max(start, buff_st_idx - overlap_len))
+            buff_nd_idx = int(min(stop, buff_st_idx + buffer_len))
+            chk_nd_idx = int(min(stop, buff_nd_idx + overlap_len))
+            rel_st_idx = int(buff_st_idx - chk_st_idx)
+            rel_nd_idx = int(buff_nd_idx - chk_st_idx)
 #             print('filtering {}--{}'.format(chk_st_idx, chk_nd_idx))
             this_y_chk = sosfiltfilt(sos, x[chk_st_idx:chk_nd_idx])
 #             print('saving {}--{}'.format(buff_st_idx, buff_nd_idx))
