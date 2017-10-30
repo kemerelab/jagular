@@ -83,7 +83,7 @@ def get_gap_lengths_from_timestamps(timestamps, *, assume_sorted=None,
     return gap_lengths
 
 def get_contiguous_segments(data, *, step=None, assume_sorted=None,
-                            in_core=True, index=False):
+                            in_core=True, index=False, inclusive=False):
     """Compute contiguous segments (seperated by step) in a list.
 
     Note! This function requires that a sorted list is passed.
@@ -133,7 +133,13 @@ def get_contiguous_segments(data, *, step=None, assume_sorted=None,
         If True, the indices of segment boundaries will be returned. Otherwise,
         the segment boundaries will be returned in terms of the data itself.
         Default is False.
+    inclusive : bool, optional
+        If True, the boundaries are returned as [(inclusive idx, inclusive idx)]
+        Default is False, and can only be used when index==True.
     """
+
+    if inclusive:
+        assert index, "option 'inclusive' can only be used with 'index=True'"
     if in_core:
         data = np.asarray(data)
 
@@ -156,7 +162,10 @@ def get_contiguous_segments(data, *, step=None, assume_sorted=None,
         stops = np.append(breaks, len(data)-1)
         bdries = np.vstack((data[starts], data[stops] + step)).T
         if index:
-            indices = np.vstack((starts, stops + 1)).T
+            if inclusive:
+                indices = np.vstack((starts, stops)).T
+            else:
+                indices = np.vstack((starts, stops + 1)).T
             return indices
     else:
         from itertools import groupby
@@ -191,7 +200,10 @@ def get_contiguous_segments(data, *, step=None, assume_sorted=None,
                 stop = start
                 for _ in gen:
                     stop +=1
-                bdries.append([start, stop + 1])
+                if inclusive:
+                    bdries.append([start, stop])
+                else:
+                    bdries.append([start, stop + 1])
                 counter = stop + 1
 
     return np.asarray(bdries)
