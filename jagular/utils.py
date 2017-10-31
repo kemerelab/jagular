@@ -44,7 +44,10 @@ def argsort(seq):
     return sorted(range(len(seq)), key=seq.__getitem__)
 
 def has_duplicate_timestamps(timestamps, *, assume_sorted=None, in_core=True):
-    """Docstring goes here."""
+    """Docstring goes here.
+
+    WARNING! THIS FUNCTION ASSUMES INTEGRAL TIMESTAMPS!
+    """
     if not assume_sorted:
         if not is_sorted(timestamps):
             timestamps = np.sort(timestamps)
@@ -61,6 +64,8 @@ def get_duplicate_timestamps(timestamps, *, assume_sorted=None, in_core=True):
     Important! Returns indices of duplicate timestamps, not timestamps directly.
     For example, if the timestamps are [0, 1, 2, 10, 11, 11, 11, 12] then this
     function will return np.array([5, 6])
+
+    WARNING! THIS FUNCTION ASSUMES INTEGRAL TIMESTAMPS!
     """
     if not assume_sorted:
         if not is_sorted(timestamps):
