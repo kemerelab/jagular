@@ -36,8 +36,40 @@ def pairwise(iterable):
     return zip(a, b)
 
 def is_sorted(iterable, key=lambda a, b: a <= b):
-    """Check to see if iterable is monotonic increasing (sorted)."""
+    """Returns True if iterable is monotonic increasing (sorted).
+
+    This function works out-of-core with time complexity O(N), and a very modest
+    memory footprint. TODO: does the all key actually quit early, or does it
+    require all elements to be compared? And what about memory footprint? Answer
+    it should quit early, with no real memory footprint, since all() is
+    equivalent to
+        def all(iterable):
+            for element in iterable:
+            if not element:
+                return False
+        return True
+    """
     return all(key(a, b) for a, b in pairwise(iterable))
+
+def _is_sorted_np(x, chunk_size=None):
+    """Returns True if iterable is monotonic increasing (sorted).
+
+    NOTE: intended for 1D array.
+
+    This function works in-core with memory footrpint XXX.
+    
+    chunk_size = 100000 is probably a good choice.
+    """
+    if chunk_size is None:
+        # chunk_size = x.size
+        chunk_size = 100000
+    stop = x.size
+    for start in range(0, stop, chunk_size):
+        stop = int(min(stop, start + chunk_size))
+        chunk = x[start:stop]
+        if not np.all(chunk[:-1] <= chunk[1:]):
+            return False
+    return True
 
 def argsort(seq):
     # http://stackoverflow.com/questions/3071415/efficient-method-to-calculate-the-rank-vector-of-a-list-in-python
