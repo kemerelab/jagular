@@ -65,7 +65,7 @@ def _is_sorted_np(x, chunk_size=None):
         chunk_size = 100000
     stop = x.size
     for start in range(0, stop, chunk_size):
-        stop = int(min(stop, start + chunk_size))
+        stop = int(min(stop, start + chunk_size + 1))
         chunk = x[start:stop]
         if not np.all(chunk[:-1] <= chunk[1:]):
             return False
