@@ -57,16 +57,14 @@ def _is_sorted_np(x, chunk_size=None):
     NOTE: intended for 1D array.
 
     This function works in-core with memory footrpint XXX.
-    
     chunk_size = 100000 is probably a good choice.
     """
     if chunk_size is None:
-        # chunk_size = x.size
         chunk_size = 100000
     stop = x.size
-    for start in range(0, stop, chunk_size):
-        stop = int(min(stop, start + chunk_size + 1))
-        chunk = x[start:stop]
+    for chunk_start in range(0, stop, chunk_size):
+        chunk_stop = int(min(stop, chunk_start + chunk_size + 1))
+        chunk = x[chunk_start:chunk_stop]
         if not np.all(chunk[:-1] <= chunk[1:]):
             return False
     return True
