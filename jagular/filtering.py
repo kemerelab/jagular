@@ -113,7 +113,7 @@ def filtfilt_mmap(timestamps, finname, foutname, fs, fl=None, fh=None,
 
 def filtfilt_within_epochs_mmap(timestamps, finname, foutname, dtype, sos,
                                 buffer_len=4194304, overlap_len=None,
-                                max_len=None, **kwargs):
+                                max_len=None, filter_epochs=None,**kwargs):
     """Zero-phase forward backward out-of-core filtering within epochs.
 
     Use memmap and chunking to filter continuous data within contiguous segments
@@ -173,10 +173,11 @@ def filtfilt_within_epochs_mmap(timestamps, finname, foutname, dtype, sos,
     assume_sorted = kwargs.get('assume_sorted', True)
     step = kwargs.get('step', 1)
 
-    filter_epochs = get_contiguous_segments(data=timestamps,
-                                            assume_sorted=assume_sorted,
-                                            step=step,
-                                            index=True)
+    if filter_epochs is None:
+        filter_epochs = get_contiguous_segments(data=timestamps,
+                                                assume_sorted=assume_sorted,
+                                                step=step,
+                                                index=True)
 
     for (start, stop) in filter_epochs:
         for buff_st_idx in range(start, stop, buffer_len):
