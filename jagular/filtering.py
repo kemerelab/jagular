@@ -12,7 +12,7 @@ import numpy as np
 
 from numpy import memmap
 from scipy.signal import sosfiltfilt, iirdesign
-from .utils import get_contiguous_segments
+from .utils import _get_contiguous_segments_fast as get_contiguous_segments
 
 def filtfilt_mmap(timestamps, finname, foutname, fs, fl=None, fh=None,
                   gpass=None, gstop=None, dtype=None, ftype='cheby2',
@@ -169,13 +169,14 @@ def filtfilt_within_epochs_mmap(timestamps, finname, foutname, dtype, sos,
     except OSError:
         raise ValueError('Not sure why this ODError is raised, actually? File already exists?')
 
-    assume_sorted = kwargs.get('assume_sorted', None)
-    step = kwargs.get('step', None)
+    # TODO: maybe defaults of assume_sorted=True and step=1 are too lenient? rethink the API slightly...
+    assume_sorted = kwargs.get('assume_sorted', True)
+    step = kwargs.get('step', 1)
 
-    filter_epochs =  get_contiguous_segments(data=timestamps,
-                                             assume_sorted=assume_sorted,
-                                             step=step,
-                                             index=True)
+    filter_epochs = get_contiguous_segments(data=timestamps,
+                                            assume_sorted=assume_sorted,
+                                            step=step,
+                                            index=True)
 
     for (start, stop) in filter_epochs:
         for buff_st_idx in range(start, stop, buffer_len):
