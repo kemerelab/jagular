@@ -193,14 +193,14 @@ def get_contiguous_segments(data, *, step=None, assume_sorted=None,
             warn("some steps in the data are smaller than the requested step size.")
 
         breaks = np.argwhere(np.diff(data)>=2*step)
-        starts = np.insert(breaks+1, 0, 0)
-        stops = np.append(breaks, len(data)-1)
+        starts = np.insert(breaks+1, 0, 0).astype(int)
+        stops = np.append(breaks, len(data)-1).astype(int)
         bdries = np.vstack((data[starts], data[stops] + step)).T
         if index:
             if inclusive:
-                indices = (np.vstack((starts, stops)).T).astype(int)
+                indices = np.vstack((starts, stops)).T
             else:
-                indices = (np.vstack((starts, stops + 1)).T).astype(int)
+                indices = np.vstack((starts, stops + 1)).T
             return indices
     else:
         from itertools import groupby
@@ -274,8 +274,8 @@ def _get_contiguous_segments_fast(data, *, step=None, assume_sorted=None,
         if np.any(breaks_in_chunk):
             breaks.extend(breaks_in_chunk)
     breaks = np.array(breaks)
-    starts = np.insert(breaks+1, 0, 0)
-    stops = np.append(breaks, len(data)-1)
+    starts = np.insert(breaks+1, 0, 0).astype(int)
+    stops = np.append(breaks, len(data)-1).astype(int)
     bdries = np.vstack((data[starts], data[stops] + step)).T 
     if index:
         if inclusive:
