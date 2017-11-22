@@ -198,9 +198,9 @@ def get_contiguous_segments(data, *, step=None, assume_sorted=None,
         bdries = np.vstack((data[starts], data[stops] + step)).T
         if index:
             if inclusive:
-                indices = np.vstack((starts, stops)).T
+                indices = (np.vstack((starts, stops)).T).astype(int)
             else:
-                indices = np.vstack((starts, stops + 1)).T
+                indices = (np.vstack((starts, stops + 1)).T).astype(int)
             return indices
     else:
         from itertools import groupby
@@ -617,6 +617,9 @@ class PrettyDuration(float):
                 # in this case, represent milliseconds in terms of
                 # seconds (i.e. a decimal)
                 sstr = str(s/1000).lstrip('0')
+                # if sstr == "1.0":
+                #     ss += 1
+                #     sstr = ""
             else:
                 # for all other cases, milliseconds will be represented
                 # as an integer
