@@ -35,7 +35,7 @@ def pairwise(iterable):
     next(b, None)
     return zip(a, b)
 
-def is_sorted(iterable, key=lambda a, b: a <= b):
+def is_sorted_old(iterable, key=lambda a, b: a <= b):
     """Returns True if iterable is monotonic increasing (sorted).
 
     This function works out-of-core with time complexity O(N), and a very modest
@@ -51,7 +51,7 @@ def is_sorted(iterable, key=lambda a, b: a <= b):
     """
     return all(key(a, b) for a, b in pairwise(iterable))
 
-def _is_sorted_np(x, chunk_size=None):
+def is_sorted(x, chunk_size=None):
     """Returns True if iterable is monotonic increasing (sorted).
 
     NOTE: intended for 1D array.
@@ -59,15 +59,19 @@ def _is_sorted_np(x, chunk_size=None):
     This function works in-core with memory footrpint XXX.
     chunk_size = 100000 is probably a good choice.
     """
-    if chunk_size is None:
-        chunk_size = 500000
-    stop = x.size
-    for chunk_start in range(0, stop, chunk_size):
-        chunk_stop = int(min(stop, chunk_start + chunk_size + 1))
-        chunk = x[chunk_start:chunk_stop]
-        if not np.all(chunk[:-1] <= chunk[1:]):
-            return False
-    return True
+    
+    if isinstance(x, np.ndarray):
+        if chunk_size is None:
+            chunk_size = 500000
+        stop = x.size
+        for chunk_start in range(0, stop, chunk_size):
+            chunk_stop = int(min(stop, chunk_start + chunk_size + 1))
+            chunk = x[chunk_start:chunk_stop]
+            if not np.all(chunk[:-1] <= chunk[1:]):
+                return False
+        return True
+    else:
+        return is_sorted_old(x)
 
 def argsort(seq):
     # http://stackoverflow.com/questions/3071415/efficient-method-to-calculate-the-rank-vector-of-a-list-in-python
@@ -119,7 +123,7 @@ def get_gap_lengths_from_timestamps(timestamps, *, assume_sorted=None,
 
 def get_contiguous_segments(data, *, step=None, assume_sorted=None,
                             in_core=True, index=False, inclusive=False):
-    """Compute contiguous segments (seperated by step) in a list.
+    """Compute contiguous segments (separated by step) in a list.
 
     Note! This function requires that a sorted list is passed.
     It first checks if the list is sorted O(n), and only sorts O(n log(n))
@@ -245,7 +249,7 @@ def get_contiguous_segments(data, *, step=None, assume_sorted=None,
 
 def _get_contiguous_segments_fast(data, *, step=None, assume_sorted=None,
                             index=False, inclusive=False):
-    """Compute contiguous segments (seperated by step) in a list.
+    """Compute contiguous segments (separated by step) in a list.
 
     Note! This function is fast, but does is not finalized.
     """
@@ -302,7 +306,7 @@ def sanitize_timestamps(timestamps, max_gap_size=150, in_core=True, ts_dtype=Non
         return False
 
     if ts_dtype is None:
-        ts_dtype = np.int64
+        ts_dtype = np.uint32
 
     timestamps_new = copy.copy(timestamps)
 
@@ -357,7 +361,7 @@ def check_timestamps(timestamps, ts_dtype=None):
         return False
 
     if ts_dtype is None:
-        ts_dtype = np.int64
+        ts_dtype = np.uint32
 
     # step 1: make sure that timestamps are integral, and the expected datatype:
     if isinstance(timestamps, np.ndarray):
@@ -404,7 +408,7 @@ def extract_channels(jfm,*, ts_out=None, max_gap_size=None, ch_out_prefix=None, 
     block_size: int, optional
         Number of packets to read in at a time. Default is 65536
     ts_dtype: np.dtype, optional
-        Type for timestamps, default is np.int64.
+        Type for timestamps, default is np.uint32.
         NOTE: currently no other types are supported!
 
     Returns
@@ -428,9 +432,9 @@ def extract_channels(jfm,*, ts_out=None, max_gap_size=None, ch_out_prefix=None, 
     if block_size is None:
         block_size = 65536
     if ts_dtype is None:
-        ts_dtype = np.int64
+        ts_dtype = np.uint32
     else:
-        raise NotImplementedError('Only np.int64 is currently supported for ts_dtype!')
+        raise NotImplementedError('Only np.uint32 is currently supported for ts_dtype!')
 
     n_chan_zfill = len(str(jfm._reader.n_spike_channels))
 
@@ -484,7 +488,7 @@ def extract_channels(jfm,*, ts_out=None, max_gap_size=None, ch_out_prefix=None, 
                     vv = np.argwhere(gap_lengths>max_gap_size)
                     ccl = (np.cumsum(cs[:,1] - cs[:,0]) - 1).astype(ts_dtype)
                     ccr = np.cumsum(cs[:,1] - cs[:,0]).astype(ts_dtype)
-                    orig_data_locs = np.vstack((np.insert(ccr[:-1],0,0),ccr)).T # want this as seperate function, too!
+                    orig_data_locs = np.vstack((np.insert(ccr[:-1],0,0),ccr)).T # want this as separate function, too!
                     split_data_ts = []
                     split_data = []
                     for kk, (start, stop) in enumerate(orig_data_locs):
