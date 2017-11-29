@@ -228,7 +228,8 @@ class SpikeGadgetsRecFileReader(JagularFileReader):
         import xml.etree.ElementTree as ET
         header_size = 1
         xmlstring = None
-        self.reindex_arr = []
+        self.reindex_arr = np.array([])
+        unconverted_hw_chan_list = []
 
         # read .rec file embedded workspace and copy to a string
         with open(filename, 'rb') as f:
@@ -264,9 +265,19 @@ class SpikeGadgetsRecFileReader(JagularFileReader):
             # tetrode data, the first four elements in reindex_arr correspond to
             # the channels of tetrode 1, the next four correspond to tetrode 2, etc.
             for spike_channel in root.iter("SpikeChannel"):
-                self.reindex_arr.append(int(spike_channel.get("hwChan")))
-            # Faster if we convert the native Python list to a numpy array when we reindex
-            self.reindex_arr = np.array(self.reindex_arr)
+                unconverted_hw_chan_list.append(int(spike_channel.get("hwChan")))
+            n_cards, rem = divmod(self.n_channels, 32)
+            if rem != 0:
+                raise ValueError("Number of neural channels must be a multiple of 32")
+            # Convert hw channels defined in workspace to actual hardware channel. The
+            # actual hardware channel tells us the packet location of the desired data
+            unconverted_hw_chan_arr = np.array(unconverted_hw_chan_list)
+            self.reindex_arr = (((unconverted_hw_chan_arr % 32) * n_cards) 
+                               + np.floor(unconverted_hw_chan_arr / 32))
+            #print(unconverted_hw_chan_list)
+            self.reindex_arr = self.reindex_arr.astype(int)
+            #print(self.reindex_arr)
+            #print(self.reindex_arr.dtype)
 
         self.n_spike_channels = len(self.reindex_arr)
         self.header_size = header_size
