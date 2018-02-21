@@ -251,7 +251,7 @@ def _get_contiguous_segments_fast(data, *, step=None, assume_sorted=None,
                             index=False, inclusive=False):
     """Compute contiguous segments (separated by step) in a list.
 
-    Note! This function is fast, but does is not finalized.
+    Note! This function is fast, but is not finalized.
     """
 
     if inclusive:
