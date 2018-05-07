@@ -341,3 +341,350 @@ class SpikeGadgetsRecFileReader(JagularFileReader):
         channel_data = (data['channel_data'].T)[self.reindex_arr]
 
         return timestamps, channel_data
+
+# import numpy as np
+# from os.path import isfile, getsize
+# from os import SEEK_SET
+# from contextlib import ExitStack
+# from jagular.utils import PrettyDuration
+# from time import time, strfrtime, localtime
+# class SpikeGadgetsRecFileReader(object):
+#     """This class can read and extract data from .rec files recorded with
+#     SpikeGadgets hardware."""
+
+#     def __init__(self, filepath, *, fs=None, start_type=None, 
+#                  timestamp_type=None, single_neural_channel_type=None):
+#         """Initializes SpikeGadgetsRecFileReader class.
+#         """
+#         # set defaults:
+#         if fs is None:
+#             fs = 30000
+#         if start_type is None:
+#             start_type = '<u1'
+#         if timestamp_type is None:
+#             timestamp_type = '<u4'
+#         if single_neural_channel_type is None:
+#             single_neural_channel_type = '<i2'
+
+#         self._filepath = filepath
+#         self._fs = fs
+#         self._start_type = start_type
+#         self._timestamp_type = timestamp_type
+#         self._single_neural_channel_type = single_neural_channel_type
+#         self._dtype = None
+#         self._reindex_arr = None
+
+#         if not isfile(self._filepath):
+#             raise IOError("%s does not exist", self._filepath)
+        
+#         self._parse_file()
+#         self._calc_time_info()
+        
+#     def __repr__(self):
+#         # TODO: Display total time and gaps
+#         address_str = " at " + str(hex(id(self)))
+
+#         return "<SpikeGadgetsRecFileReader[%s]: >%s" % (str(self._filepath), address_str)    
+
+#     def _parse_file(self, *, maxlines=None):
+#         """Parses configuration section of rec file and generates dtype that can be
+#         used to extract data from the file
+
+#         Parameters
+#         ==========
+#         maxlines : Maximum number of lines to read from the start of the file
+#             to determine configuration info. This value serves as infinite
+#             loop protection in case the file has an invalid configuration
+#             configuration section (aka the embedded workspace)
+        
+#         """
+        
+#         # TODO: Figure out better way to parse hardware listed in the
+#         # rec file configuration section, and write documentation
+#         # detailing any assumptions made
+#         if maxlines is None:
+#             maxlines = 1000
+
+#         with open(self._filepath, 'rb') as rec_fobj:
+#             fileline = []
+#             ii = 0
+#             while fileline != b'</Configuration>\n':
+#                 fileline = rec_fobj.readline()
+#                 if ii > maxlines:
+#                     raise ValueError("Could not determine configuration info, check rec file")
+#                 ii += 1
+#                 print(fileline)
+#             self._config_size = rec_fobj.tell()
+#             # Found end of configuration info, now copy it and parse
+#             rec_fobj.seek(0, SEEK_SET)
+#             xmlstring = rec_fobj.read(self.config_size)
+#             xmltree = ET.ElementTree(ET.fromstring(xmlstring))
+#             root = xmltree.getroot()
+#             global_config = root.find("GlobalConfiguration")
+#             # Don't know yet how to index into correct packet location of 
+#             # channel data if saveDisplayedChanOnly is not 0
+#             save_displayed_chan_only = int(global_config.get("saveDisplayedChanOnly"))
+#             if save_displayed_chan_only != 0:
+#                 raise NotImplementedError("Data extraction with saveDisplayedChanOnly = \"%d\"
+#                                            not currently supported", save_displayed_chan_only )
+#             # These attributes may not have always existed in rec files so handle
+#             # errors just in case
+#             timestamp_start_local = global_config.get("timestampAtCreation"))
+#             timestamp_start_system = global_config.get("systemTimeAtCreation")
+#             if timestamp_start_local is None:
+#                 warn("No timestampAtCreation attribute defined in rec file")
+#             else:
+#                 self._timestamp_start_local = np.int64(timestamp_start_local)
+#             if timestamp_start_system is None:
+#                 warn("No attribute 'systemTimeAtCreation' defined in rec file")
+#             else:
+#                 self._timestamp_start_system = np.int64(timestamp_start_system)
+
+#             device_dict = {}
+#             device_list = []
+#             device_order = []
+#             # devices such as MCU, ECU, etc.
+#             hw_config_element = root.find("HardwareConfiguration")
+#             self._n_channels = int(hw_config_element.get('numChannels'))
+#             if n_neural_channels == 0:
+#                 print("Rec file has no neural channels defined")
+#             for device_element in hw_config_element.getchildren():
+#                 # The packetOrderPreference attribute describes the location in which a
+#                 # device's data will appear in the packet. The lower this attribute's 
+#                 # value, the EARLIER it will appear. We use this information to correctly
+#                 # construct the numpy data type used to read the rec file. We do this
+#                 # because in the workspace (which is then embedded in the rec file), a
+#                 # user might not enumerate devices in the same order that their data
+#                 # appear in the packet. However, this is poor organization, so if you
+#                 # do this, stop it!
+#                 device_order.append(int(device_element.get('packetOrderPreference')))
+#                 device_list.append(  (device_element.get('name'), int(device_element.get('numBytes'))) )
+#                 device_name = device_element.get('name')
+
+#                 device_dict[device_name] = {}
+#                 for channel_element in device_element.getchildren():
+#                     if (device_name == 'RF') and (channel_element.get('dataType') != 'uint32'):
+#                         raise ValueError("RF data type not defined correctly! Must be uint32")
+#                     channel_id = channel_element.get('id')
+#                     device_dict[device_name][channel_id] = {}
+#                     #print(subelement.get('startByte'))
+#                     device_dict[device_name][channel_id] = {'start_byte': int(channel_element.get('startByte')),
+#                                                             'bit': int(channel_element.get('bit')) }
+
+#             device_list = [device_list[idx] for idx in np.argsort(device_order)]
+#             rec_dtype_list = [('start', self.start_type)]
+#             for (device_name, num_bytes) in device_list:
+#                 rec_dtype_list.append((device_name, '<u%d' % num_bytes))
+#             rec_dtype_list.append(('timestamps', self.timestamp_type))
+#             rec_dtype_list.append(('channel_data', self.single_neural_channel_type, (self.n_channels,)))
+            
+#             # Find all elements with tag "SpikeChannel"
+#             # Note that the order of elements in reindex_arr will be in the
+#             # same order as document order. For example, if we're reading
+#             # tetrode data, the first four elements in reindex_arr correspond to
+#             # the channels of tetrode 1, the next four correspond to tetrode 2, etc.
+#             for spike_channel in root.iter("SpikeChannel"):
+#                 unconverted_hw_chan_list.append(int(spike_channel.get("hwChan")))
+#             n_cards, rem = divmod(self.n_channels, 32)
+#             if rem != 0:
+#                 raise ValueError("Number of neural channels must be a multiple of 32")
+#             # Convert hw channels defined in workspace to actual hardware channel. The
+#             # actual hardware channel tells us the packet location of the desired data
+#             unconverted_hw_chan_arr = np.array(unconverted_hw_chan_list)
+#             self._reindex_arr = (((unconverted_hw_chan_arr % 32) * n_cards) 
+#                                  + np.floor(unconverted_hw_chan_arr / 32))
+
+#             self._reindex_arr = self._reindex_arr.astype(int)
+            
+#             # Everything went successfully, ok to generate the dtype now
+#             self._dtype = np.dtype(rec_dtype_list)
+        
+#     def _calc_time_info():
+#         """Calculates time info of the rec file, first and last timestamps, total timespan,
+#         total gaps, etc. All these values are stored as int64 with the same time base as that 
+#         of the sampling rate"""
+        
+#         data = np.memmap(self._filename, dtype=self._dtype, mode='r', offset=self._config_size)
+        
+#         start = data['timestamps'][0]
+#         stop = data['timestamps'][-1]
+#         self._timestamp_bounds = np.array([[start, stop]]).astype('<i8')
+
+#         start_time = start - self._timestamp_start_local + np.round(self._timestamp_start_system * self._fs / 1000.0)
+#         stop_time  = stop  - self._timestamp_start_local + np.round(self._timestamp_start_system * self._fs / 1000.0)
+#         self._timestamp_bounds_absolute = np.array([[start_time, stop_time]]).astype('<i8')
+        
+#         self._n_packets, rem = divmod(getsize(self._filepath) - self._config_size, self._dtype.itemsize)
+#         if rem:
+#             raise ValueError("Non-integral number of packets, or the dtype might be wrong")
+            
+#         self._timespan         = self._timestamp_bounds[-1] - self._timestamp_bounds[0]
+#         self._timespan_wo_gaps = self._timespan - self._n_packets
+        
+#     @property
+#     def timestamps():
+#         """A (1, 2) numpy array containing the first and
+#         last timestamps in the file. The values in
+#         the returned array can NOT be converted into a
+#         real date and time unambiguously. Units are in
+#         the same time base as that of the sampling rate."""
+        
+#         return self._timestamp_bounds
+        
+#     @property
+#     def timestamps_absolute():
+#         """A (1, 2) numpy array containing the first and
+#         last timestamps (absolute) in the file. This means
+#         that the values in the returned array can be
+#         converted into a real date and time unambiguously.
+#         Units are in the same time base as that of the
+#         sampling rate."""
+        
+#         return self._timestamp_bounds_absolute
+    
+#     @property
+#     def start(self):
+#         """First timestamp recorded in rec file. The
+#         returned value can NOT be converted into a real
+#         date and time unambiguously. Units are in the
+#         same time base as that of the sampling rate."""
+#         return self._timestamp_bounds[0]
+        
+#     @property
+#     def stop(self):      
+#         """Last timestamp recorded in rec file. The
+#         returned value can NOT be converted into a real
+#         date and time unambiguously. Units are the same
+#         time base as that of the sampling rate."""
+#         return self._timestamp_bounds[-1]
+        
+#     @property
+#     def start_absolute(self):
+#         """First timestamp (absolute) recorded in rec file.
+#         This means that the returned value can be converted
+#         into a real date and time unambiguously. Units are
+#         in the same time base as that of the sampling rate."""
+#         return self._timestamp_bounds_absolute[0]
+        
+#     @property
+#     def stop_absolute(self):       
+#         """Last timestamp (absolute) recorded in rec file.
+#         This means that the returned value can be converted
+#         into a real date and time unambiguously. Units are
+#         in the same time base as that of the sampling rate."""
+#         return self._timestamp_bounds_absolute[-1]
+    
+#     @property
+#     def start_time(self):      
+#         """Human-readable string displaying date and time
+#         of the first timestamp recorded in the rec file."""
+#         return strfrtime("%a, %m/%d/%Y at %H:%M:%S", 
+#                          localtime(self._timestamp_bounds_absolute[0] / self._fs)
+    
+#     @property
+#     def stop_time(self):      
+#         """Human-readable string displaying date and time
+#         of the last timestamp recorded in the rec file."""
+#         return strfrtime("%a, %m/%d/%Y at %H:%M:%S", 
+#                          localtime(self._timestamp_bounds_absolute[-1] / self._fs)
+    
+#     @property
+#     def duration_w_gaps():
+#         """The amount of time spanned by the data recorded
+#         in the rec file, including gaps in the data."""
+        
+#         return PrettyDuration(self._timespan / self._fs)
+        
+#     @property
+#     def duration_wo_gaps():
+#         """The amount of time spanned by the data recorded
+#         in the rec file, excluding gaps in the data."""
+        
+#         return PrettyDuration(self._timespan_wo_gaps / self._fs)
+    
+#     @property    
+#     def filepath(self):
+#         """The path to the file associated with this particular
+#         SpikeGadgetsRecFileReader instance."""
+        
+#         return self._filepath
+    
+#     @filepath.setter
+#     def filepath(self, filepath, *, **kwargs):
+#         """Changes the file to associate with this particular
+#         SpikeGadgetsRecFileReader instance."""
+        
+#         self.__init__(filepath, **kwargs)
+    
+#     @property
+#     def dtype(self):
+#         """The numpy dtype used to read the rec file"""
+        
+#         return self._dtype
+    
+#     @dtype.setter
+#     def dtype(self, dtype):
+#         """Manually set dtype used to read the rec file. Use at
+#         your own risk!"""
+        
+#         self._dtype = dtype
+        
+#     @property
+#     def fs(self):
+#         """Sampling rate of the rec file"""
+        
+#         return self._fs
+    
+#     @fs.setter
+#     def fs(self, val):
+#         """Sets sampling rate of the rec file"""
+                         
+#         self._fs = val
+        
+#     @property
+#     def timestamp(self):
+#         """Shows date and time when the rec file was created. 
+#         Date format is 'day, mm/dd/yyyy at HH:MM:SS'"""
+#         # system time in rec file saved in units of msec
+#         return "File created on " + strfrtime("%a, %m/%d/%Y at %H:%M:%S", 
+#                                               localtime(self._timestamp_start_system / 1000.0))
+    
+#     def extract_channels(self, *, block_size=None, subset='all',
+#                          ts_out=None, ch_out_prefix=None):
+#         """Extracts neural channel data and timestamps"""
+        
+#         if block_size is None:
+#             block_size = 65536
+#         if ts_out is None:
+#             ts_out = 'timestamps.raw'
+#         if subset == 'all':
+#             subset = range(self._n_neural_channels)
+                         
+#         n_chan_zfill = len(str(self._n_neural_channels))
+
+#         ch_out_files = ['ch.' + str(n).zfill(n_chan_zfill) + '.raw' for n in range(self._n_neural_channels)]
+        
+#         with ExitStack as stack:
+#             rec_fobj = stack.enter_context(open(self._filepath, 'rb'))
+#             ts_fobj  = stack.enter_context(open(ts_out, 'wb+'))
+#             ch_fobjs = [stack.enter_context(open(fname, 'wb+')) for fname in ch_out_files]
+#             recfobj.seek(self._config_size, SEEK_SET)
+#             data =  self.read_block(recfobj, block_size)
+#             channel_data = (data['channel_data'].T)[self._reindex_arr]
+                         
+#             ts_fojb.write(bytes(data['timestamps']))
+#             for ch in range(self._n_neural_channels):
+#                 ch_fobjs[ch].write(bytes(channel_data[ch, :]))
+
+#     def extract_imu(self, *, block_size=None):
+        
+#         """Extracts IMU data from rec file, if it exists"""
+        
+#     def extract_dio(self, *, block_size=None):
+        
+#         """Extracts DIOs from rec file, if it exists"""
+        
+#     def read_block(self, fobj, block_size):
+#         """Reads block of data from rec file"""
+        
+#         return np.fromfile(fobj, dtype=self.dtype, count=block_size)
